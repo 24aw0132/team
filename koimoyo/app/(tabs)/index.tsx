@@ -1,35 +1,50 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React from "react";
+import { SafeAreaView, StyleSheet, View } from "react-native";
+import TopSection from "../../components/dayCounter";
+import BottomNav from "../../components/bottomNav";
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
-import React from 'react';
-import { View } from 'react-native';
 import { Day } from '../../components/home/Day';
 
-export default function HomeScreen() {
+export default function App() {
+  const startDate = new Date("2024-04-20");
+  const today = new Date();
+  const daysSince = Math.floor((+today - +startDate) / (1000 * 60 * 60 * 24));
+
+  const yearsPassed = Math.floor(daysSince / 365);
+  const nextAnniversary = yearsPassed + 1;
+  const nextAnniversaryDays = nextAnniversary * 365;
+  const daysToNextAnniversary = nextAnniversaryDays - daysSince;
+
+  const halfYearsPassed = Math.floor((daysSince - 182.5) / 365);
+  const nextHalfAnniversary = halfYearsPassed + 1;
+  const nextHalfAnniversaryDays = Math.round(nextHalfAnniversary * 365);
+  const daysToNextHalfAnniversary = nextHalfAnniversaryDays - daysSince;
+
   return (
-    <View>
-      <Day />
-    </View>
+    <>
+      <View>
+        <Day />
+      </View>
+      <SafeAreaView style={styles.container}>
+        <TopSection
+          daysSince={daysSince}
+          nextAnniversary={nextAnniversary}
+          daysToNextAnniversary={daysToNextAnniversary}
+          nextHalfAnniversary={nextHalfAnniversary}
+          daysToNextHalfAnniversary={daysToNextHalfAnniversary}
+        />
+        <BottomNav />
+      </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: "#FDF6F4",
+    paddingTop: 40,
   },
 });

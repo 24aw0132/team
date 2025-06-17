@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   todayDateText: {
-    color: '#fff',
+    color: '#ffffff',
     fontWeight: 'bold',
   },
   buttonWrapper: {

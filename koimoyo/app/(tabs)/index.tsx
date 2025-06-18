@@ -1,6 +1,7 @@
 import React from "react";
 import { SafeAreaView, StyleSheet, Dimensions, View } from "react-native";
-import TopSection from "../../components/dayCounter";
+import TopSection from "@/components/dayCounter";
+import { Day } from "@/components/Day";
 
 import Bluetooth from "@/components/BluetoothCard"; // 新增组件（假设这是蓝牙卡）
 import StackedCards from "@/components/Dairycollect"; // 日记卡
@@ -32,6 +33,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.centerBox}>
+        <Day />
         <Bluetooth
         onPairingSuccess={handleBluetoothPairingSuccess}
         isEnabled={true} // 可根据逻辑控制蓝牙启用

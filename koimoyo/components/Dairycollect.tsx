@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -96,19 +96,23 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: (_, gestureState) => {
-      return Math.abs(gestureState.dx) > 10;
+      // 降低触发阈值，提高响应性
+      return Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
     },
     onPanResponderMove: Animated.event(
-      [null, { dx: pan.x }],
+      [null, { dx: pan.x, dy: pan.y }], // 同时监听 y 轴移动
       { useNativeDriver: false }
     ),
     onPanResponderRelease: (_, gestureState) => {
-      if (Math.abs(gestureState.dx) > 120) {
+      const { dx, vx } = gestureState; // 获取速度
+      
+      // 基于距离或速度判断是否切换卡片
+      const shouldSwipe = Math.abs(dx) > 80 || Math.abs(vx) > 0.5;
+      
+      if (shouldSwipe) {
+        const direction = dx > 0 || vx > 0 ? frameWidth : -frameWidth;
         Animated.timing(pan, {
-          toValue: { 
-            x: gestureState.dx > 0 ? frameWidth : -frameWidth, 
-            y: 0 
-          },
+          toValue: { x: direction, y: 0 },
           duration: 200,
           useNativeDriver: false
         }).start(() => {
@@ -121,14 +125,34 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
           setData(newData);
         });
       } else {
+        // 优化弹回动画
         Animated.spring(pan, {
           toValue: { x: 0, y: 0 },
           useNativeDriver: false,
-          friction: 5
+          tension: 100, // 增加张力
+          friction: 8,  // 调整摩擦力
+          speed: 14,    // 增加速度
         }).start();
       }
-    }
+    },
+    // 添加手势开始和移动过程中的处理
+    onPanResponderGrant: () => {
+      // 使用 flattenOffset 方法代替直接访问 _value
+      pan.flattenOffset();
+    },
+    onPanResponderTerminationRequest: () => false, // 防止手势被中断
   });
+
+  // 在组件中添加 useMemo 优化
+  const cardStyles = useMemo(() => {
+    return data.slice(0, MAX_CARDS).map((_, index) => {
+      const realIndex = MAX_CARDS - 1 - index;
+      return {
+        translateX: realIndex * OFFSET_X,
+        zIndex: MAX_CARDS - realIndex,
+      };
+    });
+  }, [data, OFFSET_X]);
 
   return (
     <View style={[styles.container, { paddingHorizontal: SIDE_MARGIN }]}>

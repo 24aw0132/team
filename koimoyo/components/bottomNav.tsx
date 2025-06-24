@@ -42,11 +42,10 @@ export default function BottomNav({ state, descriptors, navigation }: BottomTabB
         const isFocused = state.index === index;
 
         const iconColor = isFocused ? "#E57373" : "#B08585";
-        const routeName = route.name as "index" | "explore" | "calendar" | "star" | "list";
+        const routeName = route.name as "index" | "calendar" | "star" | "list";
 
         const icons = {
           index: <FontAwesome name="home" size={28} color={iconColor} />,
-          explore: <MaterialIcons name="explore" size={28} color={iconColor} />,
           calendar: <Entypo name="calendar" size={28} color={iconColor} />,
           star: <FontAwesome name="star" size={28} color={iconColor} />,
           list: <MaterialIcons name="list" size={28} color={iconColor} />,

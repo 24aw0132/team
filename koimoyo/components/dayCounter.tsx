@@ -8,6 +8,7 @@ type Props = {
   daysToNextAnniversary: number;
   nextHalfAnniversary: number;
   daysToNextHalfAnniversary: number;
+  anniversaryDate: string;
 };
 
 export default function TopSection({
@@ -16,23 +17,24 @@ export default function TopSection({
   daysToNextAnniversary,
   nextHalfAnniversary,
   daysToNextHalfAnniversary,
+  anniversaryDate,
 }: Props) {
   return (
     <View style={styles.topSection}>
       <View style={styles.cardLarge}>
-        <Text style={styles.label}>付き合った日</Text>
+      <Text style={styles.label}>付き合った日</Text>
         <View style={styles.cardBottomRow}>
-          <Text style={styles.subText}>24/04/20</Text>
-          <Text style={styles.dayCount}>
-            {daysSince}
-            <Text style={styles.days}>days</Text>
-          </Text>
-        </View>
-      </View>
-      <View style={styles.cardSmall}>
-        <Text style={styles.label}>{nextAnniversary}周年まであと</Text>
+        <Text style={styles.subText}>{anniversaryDate}</Text>
         <Text style={styles.dayCount}>
-          {daysToNextAnniversary}
+            {daysSince}
+        <Text style={styles.days}>days</Text>
+      </Text>
+    </View>
+  </View>
+  <View style={styles.cardSmall}>
+    <Text style={styles.label}>{nextAnniversary}周年まであと</Text>
+    <Text style={styles.dayCount}>
+      {daysToNextAnniversary}
           <Text style={styles.days}>days</Text>
         </Text>
       </View>

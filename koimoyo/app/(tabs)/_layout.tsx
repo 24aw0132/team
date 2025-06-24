@@ -1,11 +1,11 @@
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
-import BottomNav from '@/components/bottomNav'; // ✅ あなたのカスタム BottomNav
+import BottomNav from '@/components/bottomNav'; // あなたのカスタム BottomNav
 
 export default function TabLayout() {
   return (
     <Tabs
-      tabBar={(props) => <BottomNav {...props} />} // ✅ tabBar を置き換える
+      tabBar={(props) => <BottomNav {...props} />} // tabBar を置き換える
       screenOptions={{
         headerShown: false,
         tabBarStyle: Platform.select({
@@ -18,7 +18,6 @@ export default function TabLayout() {
       <Tabs.Screen name="calendar" options={{ title: "Calendar" }} />
       <Tabs.Screen name="star" options={{ title: "Star" }} />
       <Tabs.Screen name="list" options={{ title: "List" }} />
-      {/* さらに tab ページを追加することもできます */}
     </Tabs>
   );
 }

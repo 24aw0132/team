@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack, useRouter } from "expo-router";
 
@@ -31,7 +31,7 @@ export default function AnniversaryDetailScreen() {
           title: "記念日カウント",
         }}
       />
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: "#fff" }}>
         {/* バツボタン */}
         <TouchableOpacity
           style={styles.closeButton}
@@ -39,16 +39,28 @@ export default function AnniversaryDetailScreen() {
         >
           <Text style={styles.closeButtonText}>✕</Text>
         </TouchableOpacity>
+
+        {/* ページタイトル */}
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>記念日カウント</Text>
+        </View>
+
+        {/* メインカード */}
         <View style={styles.topSection}>
-          {/* ピンクのカード部分をTouchableOpacityでラップ */}
           <TouchableOpacity onPress={() => router.push("/AnniversaryEdit")}>
             <View style={styles.cardLarge}>
               <Text style={styles.label}>付き合って</Text>
-              <View style={styles.cardBottomRow}>
-                <Text style={styles.dayCount}>
-                  {daysSince}
+
+              {/* 数字とブラーを重ねる */}
+              <View style={styles.dayWrapper}>
+                <Image
+                  source={require("../assets/images/blurIMG.png")}
+                  style={styles.blurImage}
+                />
+                <View style={styles.cardBottomRow}>
+                  <Text style={styles.dayCount}>{daysSince}</Text>
                   <Text style={styles.days}>days</Text>
-                </Text>
+                </View>
               </View>
             </View>
           </TouchableOpacity>
@@ -61,7 +73,7 @@ export default function AnniversaryDetailScreen() {
 const styles = StyleSheet.create({
   closeButton: {
     position: "absolute",
-    top: 40,
+    top: 60,
     left: 20,
     zIndex: 10,
     backgroundColor: "#fff",
@@ -80,14 +92,23 @@ const styles = StyleSheet.create({
     color: "#888",
     fontWeight: "bold",
   },
+  titleContainer: {
+    marginTop: 120,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  title: {
+    fontSize: 24,
+    color: "#333",
+  },
   topSection: {
     alignItems: "center",
     marginBottom: 24,
-    marginTop: 80, // バツボタン分の余白
+    marginTop: 40,
   },
   cardLarge: {
     backgroundColor: "#F6C9CC",
-    width: 400,
+    width: 350,
     height: 200,
     borderRadius: 20,
     justifyContent: "center",
@@ -97,31 +118,39 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
-    marginTop: 22,
+    paddingVertical: 20,
+    position: "relative",
   },
   label: {
     fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 8,
+    color: "#fff",
+  },
+  dayWrapper: {
+    position: "relative",
+    width: 300,
+    height: 120,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  blurImage: {
+    position: "absolute",
+    width: 300,
+    height: 120,
+    resizeMode: "contain",
+    zIndex: 0,
   },
   cardBottomRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 12,
-  },
-  subText: {
-    fontSize: 18,
-    color: "#888",
-    marginRight: 12,
+    flexDirection: "column",
+    alignItems: "center",
   },
   dayCount: {
     fontSize: 40,
     fontWeight: "bold",
-    color: "#f88",
+    color: "#fff",
   },
   days: {
     fontSize: 18,
-    color: "#f88",
-    marginLeft: 4,
+    color: "#fff",
   },
 });

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { SafeAreaView, StyleSheet, Dimensions, View, TouchableOpacity } from "react-native";
 import TopSection from "../../components/dayCounter";
 import { useRouter } from "expo-router";
+import {Day} from "@/components/Day";
 import Bluetooth from "@/components/BluetoothCard";
 import StackedCards from "@/components/Dairycollect";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -39,6 +40,8 @@ export default function App() {
 return (
   <SafeAreaView style={styles.container}>
     <View style={styles.centerBox}>
+      {/* Day 组件单独包裹，保证宽度和间距 */}
+        <Day />
       <Bluetooth
         onPairingSuccess={() => {}}
         isEnabled={true}
@@ -62,11 +65,13 @@ return (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    flexDirection: 'column',
     backgroundColor: "#FDF6F4",
     paddingTop: 40,
   },
   centerBox: {
     alignItems: "center",
     marginTop: 20,
+    width: '100%', // 新增
   },
 });

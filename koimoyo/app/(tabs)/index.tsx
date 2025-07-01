@@ -40,13 +40,22 @@ export default function App() {
 return (
   <SafeAreaView style={styles.container}>
     <View style={styles.centerBox}>
+      <View style={{ marginBottom: 20 }}>
       {/* Day 组件单独包裹，保证宽度和间距 */}
         <Day />
-      <Bluetooth
-        onPairingSuccess={() => {}}
-        isEnabled={true}
-      />
+      </View>
+
+      <View style={{ marginBottom: 20 }}>
+        <Bluetooth
+          onPairingSuccess={() => {}}
+          isEnabled={true}
+        />
+      </View>
+
+      <View style={{ marginBottom: 20 }}>
       <StackedCards frameWidth={frameWidth} />
+      </View>
+      
       <TouchableOpacity onPress={() => router.push("/AnniversaryDetail")}>
         <TopSection
           daysSince={daysSince}

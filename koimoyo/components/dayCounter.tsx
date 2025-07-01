@@ -22,7 +22,7 @@ export default function TopSection({
   return (
     <View style={styles.topSection}>
       <View style={styles.cardLarge}>
-      <Text style={styles.label}>付き合った日</Text>
+      <Text style={styles.label}>付き合った日から</Text>
         <View style={styles.cardBottomRow}>
         <Text style={styles.subText}>{anniversaryDate}</Text>
         <Text style={styles.dayCount}>
@@ -38,13 +38,7 @@ export default function TopSection({
           <Text style={styles.days}>days</Text>
         </Text>
       </View>
-      <View style={styles.cardSmall}>
-        <Text style={styles.label}>{nextHalfAnniversary}年半記念日</Text>
-        <Text style={styles.dayCount}>
-          {daysToNextHalfAnniversary}
-          <Text style={styles.days}>days</Text>
-        </Text>
-      </View>
+      
     </View>
   );
 }
@@ -58,8 +52,9 @@ const styles = StyleSheet.create({
   cardLarge: {
     backgroundColor: "#FAD4D0",
     borderRadius: 20,
-    padding: 10,
-    width: 205,
+    padding: 15,
+    width: '55%',
+    marginInline: 10,
     justifyContent: "center",
   },
   cardBottomRow: {
@@ -70,8 +65,9 @@ const styles = StyleSheet.create({
   cardSmall: {
     backgroundColor: "#FAD4D0",
     borderRadius: 20,
-    padding: 12,
-    width: 95,
+    padding: 15,
+    width: '35%',
+    marginInline: 10,
     justifyContent: "center",
   },
   label: {
@@ -84,7 +80,7 @@ const styles = StyleSheet.create({
     color: "#B08585",
   },
   dayCount: {
-    fontSize: 12,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#A47D7D",
   },

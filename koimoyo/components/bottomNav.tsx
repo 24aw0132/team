@@ -47,7 +47,7 @@ export default function BottomNav({ state, descriptors, navigation }: BottomTabB
         const icons = {
           index: <FontAwesome name="home" size={28} color={iconColor} />,
           calendar: <Entypo name="calendar" size={28} color={iconColor} />,
-          star: <FontAwesome name="star" size={28} color={iconColor} />,
+          star: <FontAwesome name="book" size={28} color={iconColor} />,
           list: <MaterialIcons name="list" size={28} color={iconColor} />,
         };
 

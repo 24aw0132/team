@@ -41,7 +41,7 @@ return (
   <SafeAreaView style={styles.container}>
     <View style={styles.centerBox}>
       <View style={{ marginBottom: 20 }}>
-      {/* Day 组件单独包裹，保证宽度和间距 */}
+      {/* Dayコンポーネントを個別にラップして、幅と間隔を確保*/}
         <Day />
       </View>
 
@@ -81,6 +81,6 @@ const styles = StyleSheet.create({
   centerBox: {
     alignItems: "center",
     marginTop: 20,
-    width: '100%', // 新增
+    width: '100%',
   },
 });

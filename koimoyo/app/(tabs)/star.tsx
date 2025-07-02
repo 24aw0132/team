@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ImageBackground } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ImageBackground
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -12,6 +19,7 @@ interface DiaryCard {
   content: string;
 }
 
+// 日記データ
 const cardsData: DiaryCard[] = [
   {
     id: 1,
@@ -55,37 +63,28 @@ const cardsData: DiaryCard[] = [
   }
 ];
 
+function DashedLine({ height = 100, dashHeight = 6, gap = 4, color = '#ccc' }) {
+  const dashes = [];
+  const count = Math.floor(height / (dashHeight + gap));
+  for (let i = 0; i < count; i++) {
+    dashes.push(
+      <View
+        key={i}
+        style={{
+          width: 2,
+          height: dashHeight,
+          backgroundColor: color,
+          marginBottom: gap,
+        }}
+      />
+    );
+  }
+
+  return <View style={{ width: 2, alignItems: 'center' }}>{dashes}</View>;
+}
+
 export default function Star() {
-  const [favorites, setFavorites] = useState<number[]>([1, 2, 3, 4, 5]); // 假设收藏了这些日记
-
-  // 获取今天的日期
-  const today = new Date().toISOString().split('T')[0].replace(/-/g, '/');
-
-  // 收藏日记，按日期降序
-  const favoriteEntries = cardsData
-    .filter(card => favorites.includes(card.id))
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  // 今日日记
-  const todayEntry = favoriteEntries.find(entry => entry.date === today);
-
-  // 按月份分组
-  const groupedEntries = favoriteEntries.reduce((acc, entry) => {
-    // 用字符串分割方式获取月份
-    const parts = entry.date.split('/');
-    const month = parts.length > 1 ? parseInt(parts[1], 10) : 0;
-    const monthKey = `${month}月`;
-    if (!acc[monthKey]) acc[monthKey] = [];
-    acc[monthKey].push(entry);
-    return acc;
-  }, {} as Record<string, DiaryCard[]>);
-
-  // 月份排序（新到旧）
-  const months = Object.keys(groupedEntries).sort((a, b) => {
-    const monthA = parseInt(a);
-    const monthB = parseInt(b);
-    return monthB - monthA;
-  });
+  const [favorites, setFavorites] = useState<number[]>([]);
 
   const toggleFavorite = (id: number) => {
     if (favorites.includes(id)) {
@@ -95,60 +94,56 @@ export default function Star() {
     }
   };
 
+  const groupedEntries = cardsData.reduce((acc, entry) => {
+    const month = entry.date.split('/')[1];
+    const key = `${parseInt(month)}月`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(entry);
+    return acc;
+  }, {} as Record<string, DiaryCard[]>);
+
+  const months = Object.keys(groupedEntries).sort((a, b) => parseInt(b) - parseInt(a));
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>お気に入りの日記</Text>
-      </View>
-      <View style={styles.flexRow}>
-        {/* 左侧月份栏 */}
-        <View style={styles.monthBar}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingVertical: 20}}>
-            {months.map(month => (
-              <Text key={month} style={styles.monthBarText}>{month}</Text>
-            ))}
-          </ScrollView>
-        </View>
-        {/* 右侧内容 */}
-        <View style={styles.contentArea}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{padding: 20}}>
-            {/* 今日 */}
-            <View style={styles.todayContentSection}>
-              <Text style={styles.monthContentTitle}>今日 ({today})</Text>
-              {todayEntry ? (
-                <DiaryCardView entry={todayEntry} favorites={favorites} toggleFavorite={toggleFavorite} />
-              ) : (
-                <View style={styles.noEntryCard}>
-                  <Text style={styles.noEntryText}>今日の記録はまだです</Text>
-                </View>
-              )}
+      <Text style={styles.pageTitle}>日記一覧</Text>
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+        {months.map(month => (
+          <View key={month} style={styles.monthSection}>
+
+            <View style={styles.timelineRow}>
+              <View style={styles.monthLabel}>
+                <Text style={styles.monthText}>{month}</Text>
+              </View>
             </View>
-            {/* 月份分组 */}
-            {months.map(month => (
-              <View key={month} style={styles.monthContentSection}>
-                <Text style={styles.monthContentTitle}>{month}</Text>
-                {groupedEntries[month].map(entry => (
+            {groupedEntries[month].map(entry => (
+              <View key={entry.id} style={styles.timelineRow}>
+                <DashedLine height={220} />
+                <View style={styles.cardWrapper}>
                   <DiaryCardView
-                    key={entry.id}
                     entry={entry}
                     favorites={favorites}
                     toggleFavorite={toggleFavorite}
                   />
-                ))}
+                </View>
               </View>
             ))}
-          </ScrollView>
-        </View>
-      </View>
+          </View>
+        ))}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-// 单个日记卡片
-function DiaryCardView({ entry, favorites, toggleFavorite }: {
-  entry: DiaryCard,
-  favorites: number[],
-  toggleFavorite: (id: number) => void
+//日記カード
+function DiaryCardView({
+  entry,
+  favorites,
+  toggleFavorite,
+}: {
+  entry: DiaryCard;
+  favorites: number[];
+  toggleFavorite: (id: number) => void;
 }) {
   return (
     <View style={styles.diaryCard}>
@@ -158,9 +153,9 @@ function DiaryCardView({ entry, favorites, toggleFavorite }: {
         resizeMode="cover"
       >
         <View style={styles.cardOverlay} />
-        <View style={styles.cardHeader}>
-          <View style={styles.locationContainer}>
-            <Ionicons name="location-outline" size={16} color="white" />
+        <View style={styles.cardTopRow}>
+          <View style={styles.locationTag}>
+            <Ionicons name="location-outline" size={14} color="white" />
             <Text style={styles.locationText}>{entry.location}</Text>
           </View>
           <TouchableOpacity
@@ -168,15 +163,15 @@ function DiaryCardView({ entry, favorites, toggleFavorite }: {
             onPress={() => toggleFavorite(entry.id)}
           >
             <Ionicons
-              name={favorites.includes(entry.id) ? "star" : "star-outline"}
-              size={20}
+              name={favorites.includes(entry.id) ? 'star' : 'star-outline'}
+              size={18}
               color="#FFD700"
             />
           </TouchableOpacity>
         </View>
         <View style={styles.cardFooter}>
           <Text style={styles.cardTitle}>{entry.title}</Text>
-          <Text style={styles.dateText}>{entry.date}</Text>
+          <Text style={styles.cardDate}>{entry.date}</Text>
         </View>
       </ImageBackground>
     </View>
@@ -184,53 +179,48 @@ function DiaryCardView({ entry, favorites, toggleFavorite }: {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#333',
-  },
-  flexRow: { flex: 1, flexDirection: 'row' },
-  monthBar: {
-    width: 60,
-    backgroundColor: 'white',
-    borderRightWidth: 1,
-    borderRightColor: '#e0e0e0',
+  container: { flex: 1, backgroundColor: '#FDF6F4' },
+  monthSection: { marginBottom: 30 },
+  timelineRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-start',
   },
-  monthBarText: {
-    fontSize: 18,
+  pageTitle: {
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#666',
-    marginVertical: 16,
+    color: '#A47D7D',
+    textAlign: 'center',
+    height: 40,
+    marginTop: 20,
+    marginBottom: 10,
   },
-  contentArea: { flex: 1, backgroundColor: '#f5f5f5' },
-  todayContentSection: { marginBottom: 30 },
-  monthContentSection: { marginBottom: 30 },
-  monthContentTitle: {
-    fontSize: 20,
+  monthLabel: {
+  paddingHorizontal: 8,
+  paddingVertical: 2,
+  borderRadius: 8,
+  marginVertical: 4,
+  marginLeft: -15,
+  },
+  monthText: {
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 15,
+  },
+  cardWrapper: {
+    marginLeft: 12,
+    flex: 1,
   },
   diaryCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    marginBottom: 16,
+    borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: '#fff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+    marginBottom: 20,
   },
   cardImage: {
     height: 200,
@@ -240,18 +230,17 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  cardHeader: {
+  cardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
+    padding: 10,
   },
-  locationContainer: {
+  locationTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 2,
     borderRadius: 12,
   },
   locationText: {
@@ -260,43 +249,24 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   favoriteButton: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardFooter: { padding: 16 },
+  cardFooter: {
+    padding: 12,
+  },
   cardTitle: {
-    color: 'white',
     fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  dateText: {
     color: 'white',
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  cardDate: {
     fontSize: 14,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  noEntryCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-    borderStyle: 'dashed',
-  },
-  noEntryText: {
-    fontSize: 16,
-    color: '#999',
-    fontStyle: 'italic',
+    color: 'white',
   },
 });

@@ -1,8 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { SafeAreaView, StyleSheet, Dimensions, View, TouchableOpacity } from "react-native";
+import {
+  SafeAreaView,
+  StyleSheet,
+  Dimensions,
+  View,
+  TouchableOpacity,
+  Image,
+  Text,
+} from "react-native";
 import TopSection from "../../components/dayCounter";
 import { useRouter } from "expo-router";
-import {Day} from "@/components/Day";
+import { Day } from "@/components/Day";
 import Bluetooth from "@/components/BluetoothCard";
 import StackedCards from "@/components/Dairycollect";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -31,56 +39,83 @@ export default function App() {
   const nextHalfAnniversaryDays = Math.round(nextHalfAnniversary * 365);
   const daysToNextHalfAnniversary = nextHalfAnniversaryDays - daysSince;
 
-  // ここで日付をYY/MM/DD形式に変換
-  const formattedDate = `${String(startDate.getFullYear()).slice(2)}/${String(startDate.getMonth() + 1).padStart(2, "0")}/${String(startDate.getDate()).padStart(2, "0")}`;
+  const formattedDate = `${String(startDate.getFullYear()).slice(2)}/${String(
+    startDate.getMonth() + 1
+  ).padStart(2, "0")}/${String(startDate.getDate()).padStart(2, "0")}`;
 
   const screenWidth = Dimensions.get("window").width;
   const frameWidth = Math.min(screenWidth - 40, 400);
 
-return (
-  <SafeAreaView style={styles.container}>
-    <View style={styles.centerBox}>
-      <View style={{ marginBottom: 20 }}>
-      {/* Dayコンポーネントを個別にラップして、幅と間隔を確保*/}
-        <Day />
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.logo}>❤️こいもよう</Text>
+        <TouchableOpacity onPress={() => router.push("/mypage")}>
+          <Image
+            source={require("../../assets/avatar.png")} // 替换为你的头像图片路径
+            style={styles.avatar}
+          />
+        </TouchableOpacity>
       </View>
 
-      <View style={{ marginBottom: 20 }}>
-        <Bluetooth
-          onPairingSuccess={() => {}}
-          isEnabled={true}
-        />
-      </View>
+      <View style={styles.centerBox}>
+        <View style={{ marginBottom: 20 }}>
+          <Day />
+        </View>
 
-      <View style={{ marginBottom: 20 }}>
-      <StackedCards frameWidth={frameWidth} />
+        <View style={{ marginBottom: 20 }}>
+          <Bluetooth onPairingSuccess={() => {}} isEnabled={true} />
+        </View>
+
+        <View style={{ marginBottom: 20 }}>
+          <StackedCards frameWidth={frameWidth} />
+        </View>
+
+        <TouchableOpacity onPress={() => router.push("/AnniversaryDetail")}>
+          <TopSection
+            daysSince={daysSince}
+            nextAnniversary={nextAnniversary}
+            daysToNextAnniversary={daysToNextAnniversary}
+            nextHalfAnniversary={nextHalfAnniversary}
+            daysToNextHalfAnniversary={daysToNextHalfAnniversary}
+            anniversaryDate={formattedDate}
+          />
+        </TouchableOpacity>
       </View>
-      
-      <TouchableOpacity onPress={() => router.push("/AnniversaryDetail")}>
-        <TopSection
-          daysSince={daysSince}
-          nextAnniversary={nextAnniversary}
-          daysToNextAnniversary={daysToNextAnniversary}
-          nextHalfAnniversary={nextHalfAnniversary}
-          daysToNextHalfAnniversary={daysToNextHalfAnniversary}
-          anniversaryDate={formattedDate}
-        />
-      </TouchableOpacity>
-    </View>
-  </SafeAreaView>
-);
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'column',
+    flexDirection: "column",
     backgroundColor: "#FDF6F4",
     paddingTop: 40,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  logo: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#f66",
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "#fbb",
   },
   centerBox: {
     alignItems: "center",
     marginTop: 20,
-    width: '100%',
+    width: "100%",
   },
 });

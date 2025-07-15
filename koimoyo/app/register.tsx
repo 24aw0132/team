@@ -9,7 +9,7 @@ import {
   ScrollView
 } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth } from '../firebase';
 import { db } from '../firebase';
 import { useRouter } from 'expo-router';
@@ -24,6 +24,35 @@ export default function Register() {
 
   const router = useRouter();
 
+  // ランダムな "ABC123" のようなIDを生成
+  const generateCustomId = () => {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const randomLetters = Array.from({ length: 3 }, () =>
+      letters[Math.floor(Math.random() * letters.length)]
+    ).join('');
+
+    const randomNumbers = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, '0');
+
+    return randomLetters + randomNumbers;
+  };
+
+  // 既に存在するIDを避けて一意なIDを生成
+  const ensureUniqueId = async () => {
+    let id = '';
+    let exists = true;
+
+    while (exists) {
+      id = generateCustomId();
+      const docRef = doc(db, 'users', id);
+      const docSnap = await getDoc(docRef);
+      exists = docSnap.exists();
+    }
+
+    return id;
+  };
+
   const handleRegister = async () => {
     if (!email || !password || !nickname || !birthday) {
       Alert.alert('エラー', 'すべての項目を入力してください');
@@ -34,15 +63,20 @@ export default function Register() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Firestore に書き込み
-      await setDoc(doc(db, 'users', user.uid), {
+      const customId = await ensureUniqueId(); // 一意なカスタムIDを生成
+
+      // Firestore に書き込み（文書ID = customId, フィールドにも userId を保存）
+      await setDoc(doc(db, 'users', customId), {
+        userId: customId,        // ✅ ここが重要：後でUIで表示しやすくなる
         email,
         nickname,
         birthday,
-        hobby
+        hobby,
+        authUid: user.uid,       // Firebase Auth UID を保持
+        createdAt: new Date()
       });
 
-      Alert.alert('登録成功', 'ようこそ！');
+      Alert.alert('登録成功', `ようこそ！あなたのIDは ${customId} です`);
       router.replace('/'); // 登録成功後、トップページへ
     } catch (error: any) {
       console.error(error.code);

@@ -53,7 +53,7 @@ export default function App() {
         <Text style={styles.logo}>❤️こいもよう</Text>
         <TouchableOpacity onPress={() => router.push("/mypage")}>
           <Image
-            source={require("../../assets/avatar.png")} // 替换为你的头像图片路径
+            source={require("../../assets/avatar.png")} 
             style={styles.avatar}
           />
         </TouchableOpacity>

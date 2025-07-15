@@ -1,14 +1,7 @@
 import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  Platform
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 interface BluetoothCardProps {
   onPairingSuccess?: () => void;
@@ -19,6 +12,7 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({
   onPairingSuccess,
   isEnabled = true
 }) => {
+  const router = useRouter();
   const [isScanning, setIsScanning] = useState(false);
   const [lastConnectDate, setLastConnectDate] = useState('25/05/01');
   const [connectCount, setConnectCount] = useState(34);
@@ -26,12 +20,12 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({
 
   const handleConnect = useCallback(() => {
     if (!isEnabled) {
-      Alert.alert('提示', '需要完成前置任务才能解锁此功能');
+      Alert.alert('注意', 'この機能を使うには事前のタスクを完了してください');
       return;
     }
 
     setIsScanning(true);
-    // 模拟蓝牙连接过程
+    // Bluetooth接続プロセスをシミュレート
     setTimeout(() => {
       setIsScanning(false);
       setConnectCount(prev => prev + 1);
@@ -41,16 +35,25 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({
     }, 2000);
   }, [isEnabled, onPairingSuccess]);
 
+  const handlePress = () => {
+    if (!isEnabled) return;
+    router.push('/DiaryWriting');
+  };
+
+  
+
   return (
     <TouchableOpacity
       style={[styles.container, !isEnabled && styles.disabled]}
-      onPress={handleConnect}
-      disabled={isScanning || !isEnabled}
+      onPress={handlePress}
+      disabled={!isEnabled}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>相手と一緒に連携しよう～</Text>
-        
-        <View style={styles.infoContainer}>
+        <Text style={styles.title}>連携しよう！</Text>
+        <Ionicons name="bluetooth-outline" size={28} color="#007AFF" />
+      </View>
+
+      <View style={styles.infoContainer}>
           <Text style={styles.subtitle}>
             前回の日記から：{daysSinceLastConnect}日前
           </Text>
@@ -75,18 +78,16 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({
             </Text>
           </View>
         </View>
-      </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    width: '90%',
+    width: 300,
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
-    marginVertical: 10,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -100,20 +101,23 @@ const styles = StyleSheet.create({
     }),
   },
   disabled: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   content: {
     alignItems: 'center',
+    gap: 12,
   },
   title: {
     fontSize: 20,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 16,
+    width: '100%',
+    textAlign: 'center',
   },
   infoContainer: {
     width: '100%',
     alignItems: 'center',
+    marginTop: 16,
   },
   subtitle: {
     fontSize: 16,

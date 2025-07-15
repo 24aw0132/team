@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   SafeAreaView,
   StyleSheet,
@@ -9,9 +9,9 @@ import {
   Text,
 } from "react-native";
 import TopSection from "../../components/dayCounter";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Day } from "@/components/Day";
-import Bluetooth from "@/components/BluetoothCard";
+import BluetoothCard from "@/components/BluetoothCard";
 import StackedCards from "@/components/Dairycollect";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -19,7 +19,8 @@ const ANNIVERSARY_KEY = "ANNIVERSARY_DATE";
 
 export default function App() {
   const router = useRouter();
-  const [startDate, setStartDate] = useState<Date>(new Date("2024-04-20")); // デフォルト値
+  const [startDate, setStartDate] = useState<Date>(new Date("2024-04-20"));
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -28,17 +29,20 @@ export default function App() {
     })();
   }, []);
 
+  // 画面がフォーカスされるたびにStackedCardsを更新
+  useFocusEffect(
+    useCallback(() => {
+      setRefreshKey(prev => prev + 1);
+    }, [])
+  );
+
   const today = new Date();
   const daysSince = Math.floor((+today - +startDate) / (1000 * 60 * 60 * 24));
   const yearsPassed = Math.floor(daysSince / 365);
   const nextAnniversary = yearsPassed + 1;
-  const nextAnniversaryDays = nextAnniversary * 365;
-  const daysToNextAnniversary = nextAnniversaryDays - daysSince;
-  const halfYearsPassed = Math.floor((daysSince - 182.5) / 365);
-  const nextHalfAnniversary = halfYearsPassed + 1;
-  const nextHalfAnniversaryDays = Math.round(nextHalfAnniversary * 365);
-  const daysToNextHalfAnniversary = nextHalfAnniversaryDays - daysSince;
-
+  const daysToNextAnniversary = (nextAnniversary * 365) - daysSince;
+  const nextHalfAnniversary = Math.floor((daysSince + 182.5) / 365);
+  const daysToNextHalfAnniversary = Math.round(nextHalfAnniversary * 365 - daysSince);
   const formattedDate = `${String(startDate.getFullYear()).slice(2)}/${String(
     startDate.getMonth() + 1
   ).padStart(2, "0")}/${String(startDate.getDate()).padStart(2, "0")}`;
@@ -48,12 +52,11 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.logo}>❤️こいもよう</Text>
         <TouchableOpacity onPress={() => router.push("/mypage")}>
           <Image
-            source={require("../../assets/avatar.png")} 
+            source={require("../../assets/avatar.png")}
             style={styles.avatar}
           />
         </TouchableOpacity>
@@ -65,11 +68,11 @@ export default function App() {
         </View>
 
         <View style={{ marginBottom: 20 }}>
-          <Bluetooth onPairingSuccess={() => {}} isEnabled={true} />
+          <BluetoothCard isEnabled={true} />
         </View>
 
         <View style={{ marginBottom: 20 }}>
-          <StackedCards frameWidth={frameWidth} />
+          <StackedCards key={refreshKey} frameWidth={frameWidth} />
         </View>
 
         <TouchableOpacity onPress={() => router.push("/AnniversaryDetail")}>
@@ -90,7 +93,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: "column",
     backgroundColor: "#FDF6F4",
     paddingTop: 40,
   },

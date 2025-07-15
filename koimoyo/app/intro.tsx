@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Button, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import Checkbox from 'expo-checkbox';
 import { useRouter } from 'expo-router';
+import { getAuth } from 'firebase/auth';
 
 const TERMS_TEXT = `
             最終更新日：2025年7月8日
@@ -54,6 +55,15 @@ export default function IntroScreen() {
   const router = useRouter();
   const [agreed, setAgreed] = useState(false);
   const [tab, setTab] = useState<'terms' | 'guide'>('terms');
+
+  // ここでログイン状態をチェック
+  React.useEffect(() => {
+    const auth = getAuth();
+    if (auth.currentUser) {
+      // すでにログインしている場合はメイン画面へ遷移
+      router.replace('../(tabs)'); // または router.replace('/(tabs)') など
+    }
+  }, []);
 
   return (
     <View style={styles.container}>

@@ -1,19 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ImageBackground
+  ImageBackground,
+  Alert,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { db, auth } from '../../firebase';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+} from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface DiaryCard {
-  id: number;
+  id: string;
   title: string;
   location: string;
   date: string;
@@ -42,44 +51,71 @@ function DashedLine({ height = 100, dashHeight = 6, gap = 4, color = '#ccc' }) {
 
 export default function Star() {
   const router = useRouter();
-  const [favorites, setFavorites] = useState<number[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [cardsData, setCardsData] = useState<DiaryCard[]>([]);
 
-  // AsyncStorageからお気に入りと日記データを読み込み
-  const loadData = async () => {
-    try {
-      const savedCards = await AsyncStorage.getItem('diary_cards');
-      const savedFavorites = await AsyncStorage.getItem('favorite_ids');
-      setCardsData(savedCards ? JSON.parse(savedCards) : []);
-      setFavorites(savedFavorites ? JSON.parse(savedFavorites) : []);
+const loadDiaries = async () => {
+  try {
+    const currentUid = auth.currentUser?.uid;
+    if (!currentUid) return;
+
+    const partnerUid = await AsyncStorage.getItem('PARTNER_UID');
+    if (!partnerUid) return;
+
+    const q = query(
+      collection(db, 'shared_diaries'),
+      where('partnerUid', 'in', [currentUid, partnerUid]),
+      orderBy('createdAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+      const diaries: DiaryCard[] = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        const dateObj = data.createdAt?.toDate();
+        const formattedDate = dateObj
+          ? `${dateObj.getFullYear()}/${dateObj.getMonth() + 1}/${dateObj.getDate()}`
+          : '';
+        return {
+          id: doc.id,
+          title: data.title || '',
+          content: data.content || '',
+          location: data.location || '',
+          date: formattedDate,
+          backgroundImage: data.images?.[0] || '',
+        };
+      });
+      setCardsData(diaries);
     } catch (e) {
-      console.error('AsyncStorage読み込みエラー:', e);
+      Alert.alert('エラー', '日記の取得に失敗しました');
+      console.error('Fetch error:', e);
+    }
+  };
+
+  const loadFavorites = async () => {
+    try {
+      const fav = await AsyncStorage.getItem('favorite_ids');
+      setFavorites(fav ? JSON.parse(fav) : []);
+    } catch (e) {
+      console.error('Failed to load favorites:', e);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      loadDiaries();
+      loadFavorites();
     }, [])
   );
 
-  // お気に入り追加・削除 & AsyncStorage保存
-  const toggleFavorite = async (id: number) => {
-    let updated: number[];
-    if (favorites.includes(id)) {
-      updated = favorites.filter(favId => favId !== id);
-    } else {
-      updated = [...favorites, id];
-    }
+  const toggleFavorite = async (id: string) => {
+    const updated = favorites.includes(id)
+      ? favorites.filter(favId => favId !== id)
+      : [...favorites, id];
+
     setFavorites(updated);
-    try {
-      await AsyncStorage.setItem('favorite_ids', JSON.stringify(updated));
-    } catch (e) {
-      console.error('お気に入り保存エラー:', e);
-    }
+    await AsyncStorage.setItem('favorite_ids', JSON.stringify(updated));
   };
 
-  // 月ごとにグルーピング
   const groupedEntries = cardsData.reduce((acc, entry) => {
     const month = entry.date.split('/')[1];
     const key = `${parseInt(month)}月`;
@@ -109,7 +145,7 @@ export default function Star() {
                     entry={entry}
                     favorites={favorites}
                     toggleFavorite={toggleFavorite}
-                    onPress={() => router.push(`/DiaryDetail?id=${entry.id}`)}
+                    onPress={() => router.push(`/diaryDetail?id=${entry.id}&type=shared`)}
                   />
                 </View>
               </View>
@@ -128,8 +164,8 @@ function DiaryCardView({
   onPress,
 }: {
   entry: DiaryCard;
-  favorites: number[];
-  toggleFavorite: (id: number) => void;
+  favorites: string[];
+  toggleFavorite: (id: string) => void;
   onPress: () => void;
 }) {
   return (
@@ -148,7 +184,7 @@ function DiaryCardView({
           <TouchableOpacity
             style={styles.favoriteButton}
             onPress={(e) => {
-              e.stopPropagation(); // タップイベントのバブリング防止
+              e.stopPropagation();
               toggleFavorite(entry.id);
             }}
           >
@@ -169,6 +205,7 @@ function DiaryCardView({
 }
 
 const styles = StyleSheet.create({
+  // ...与之前相同的样式（可复用原本 styles）
   container: { flex: 1, backgroundColor: '#FDF6F4' },
   monthSection: { marginBottom: 30 },
   timelineRow: {

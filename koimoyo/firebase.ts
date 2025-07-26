@@ -1,7 +1,7 @@
 // firebase.ts
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'; // ✅ Firestore を追加
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBK6nz8E5yhYektsaF2Xzrmv2kArmM5gg8',
@@ -15,7 +15,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 const auth = getAuth(app);
-const db = getFirestore(app); // ✅ Firestore を初期化
+const db = getFirestore(app);
 
-export { auth, db }; // ✅ 両方 export
+export { auth, db };
+
 

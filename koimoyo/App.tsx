@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Calendar from './app/(tabs)/calendar';
-import DiaryDetail from './app/DiaryDetail';
+import DiaryDetail from './app/diaryDetail';
 import { TouchableOpacity, View, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 

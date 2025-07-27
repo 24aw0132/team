@@ -108,12 +108,55 @@ const loadDiaries = async () => {
   );
 
   const toggleFavorite = async (id: string) => {
-    const updated = favorites.includes(id)
+    const isCurrentlyFavorite = favorites.includes(id);
+    const updated = isCurrentlyFavorite
       ? favorites.filter(favId => favId !== id)
       : [...favorites, id];
 
     setFavorites(updated);
     await AsyncStorage.setItem('favorite_ids', JSON.stringify(updated));
+    
+    // Dairycollect用のデータも更新
+    try {
+      // 現在のお気に入り日記データを取得または作成
+      const currentDiaryCards = await AsyncStorage.getItem('diary_cards');
+      let diaryCards = currentDiaryCards ? JSON.parse(currentDiaryCards) : [];
+      
+      if (!isCurrentlyFavorite && updated.includes(id)) {
+        // お気に入りに追加する場合
+        const targetCard = cardsData.find(card => card.id === id);
+        if (targetCard) {
+          // Firebase document IDをそのまま使用し、数値IDは別途生成
+          const diaryCard = {
+            id: Date.now(), // タイムスタンプを数値IDとして使用
+            firebaseId: targetCard.id, // 元のFirebase IDを保持
+            title: targetCard.title,
+            location: targetCard.location,
+            date: targetCard.date,
+            backgroundImage: targetCard.backgroundImage,
+            content: targetCard.content,
+          };
+          
+          // 重複を避けて追加（Firebase IDで確認）
+          const existingIndex = diaryCards.findIndex((card: any) => card.firebaseId === targetCard.id);
+          if (existingIndex === -1) {
+            diaryCards.push(diaryCard);
+          }
+        }
+        // お気に入り追加の成功メッセージ
+        Alert.alert('お気に入りに追加', 'この日記をお気に入りに追加しました！');
+      } else if (isCurrentlyFavorite && !updated.includes(id)) {
+        // お気に入りから削除する場合
+        diaryCards = diaryCards.filter((card: any) => card.firebaseId !== id);
+        // お気に入り削除の成功メッセージ
+        Alert.alert('お気に入りから削除', 'この日記をお気に入りから削除しました。');
+      }
+      
+      await AsyncStorage.setItem('diary_cards', JSON.stringify(diaryCards));
+    } catch (e) {
+      console.error('Dairycollectデータ更新失敗:', e);
+      Alert.alert('エラー', 'お気に入りの更新に失敗しました。');
+    }
   };
 
   const groupedEntries = cardsData.reduce((acc, entry) => {

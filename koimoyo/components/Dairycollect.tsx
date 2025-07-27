@@ -5,10 +5,11 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 
 interface DiaryCard {
   id: number;
+  firebaseId?: string; // Firebase document IDを保持
   title: string;
   location: string;
   date: string;
@@ -25,7 +26,7 @@ const MAX_VISIBLE_CARDS = 3;
 
 const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
   const [cards, setCards] = useState<DiaryCard[]>([]);
-  const [favorites, setFavorites] = useState<number[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]); // 文字列配列に変更
   const [currentIndex, setCurrentIndex] = useState(0);
   const pan = useRef(new Animated.ValueXY()).current;
   const router = useRouter();
@@ -38,12 +39,16 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
         
         if (saved && savedFavorites) {
           const allCards: DiaryCard[] = JSON.parse(saved);
-          const favoriteIds: number[] = JSON.parse(savedFavorites);
+          const favoriteIds: string[] = JSON.parse(savedFavorites); // 文字列配列に変更
           
-          // お気に入りの日記のみをフィルタリング
-          const favoriteCards = allCards.filter(card => favoriteIds.includes(card.id));
+          // お気に入りの日記のみをフィルタリング（firebaseIdまたはIDを文字列として比較）
+          const favoriteCards = allCards.filter(card => {
+            const cardId = card.firebaseId || card.id.toString();
+            return favoriteIds.includes(cardId);
+          });
+          
           setCards(favoriteCards);
-          setFavorites(favoriteIds);
+          setFavorites(favoriteIds); // 文字列配列として保持
         }
       } catch (e) {
         console.error('日記読み込み失敗:', e);
@@ -52,31 +57,65 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
     loadData();
   }, []);
 
+    // フォーカス時にデータを再読み込み
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadData = async () => {
+        try {
+          const saved = await AsyncStorage.getItem('diary_cards');
+          const savedFavorites = await AsyncStorage.getItem('favorite_ids');
+          
+          if (saved && savedFavorites) {
+            const allCards: DiaryCard[] = JSON.parse(saved);
+            const favoriteIds: string[] = JSON.parse(savedFavorites);
+            
+            const favoriteCards = allCards.filter(card => {
+              const cardId = card.firebaseId || card.id.toString();
+              return favoriteIds.includes(cardId);
+            });
+            
+            setCards(favoriteCards);
+            setFavorites(favoriteIds);
+          }
+        } catch (e) {
+          console.error('日記読み込み失敗:', e);
+        }
+      };
+      loadData();
+    }, [])
+  );
+
   const CARD_WIDTH = frameWidth * (212 / 400);
   const OFFSET_X = frameWidth * OFFSET_X_RATIO;
 
   // スワイプジェスチャーの設定
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], {
+    onMoveShouldSetPanResponder: (_, gestureState) => {
+      // 横向きのジェスチャーのみ反応
+      return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 10;
+    },
+    onPanResponderMove: Animated.event([null, { dx: pan.x }], {
       useNativeDriver: false,
     }),
     onPanResponderRelease: (_, gestureState) => {
-      const threshold = 100;
+      const threshold = 50;
+      const velocity = Math.abs(gestureState.vx);
       
-      if (gestureState.dx > threshold) {
-        // 右スワイプ：前のカードに戻る（ループ対応）
-        setCurrentIndex(currentIndex === 0 ? cards.length - 1 : currentIndex - 1);
-      } else if (gestureState.dx < -threshold) {
-        // 左スワイプ：次のカードに進む（ループ対応）
-        setCurrentIndex((currentIndex + 1) % cards.length);
+      if (gestureState.dx > threshold || (gestureState.dx > 20 && velocity > 0.3)) {
+        // 右スワイプ：前のカードに戻る
+        setCurrentIndex(prev => prev === 0 ? cards.length - 1 : prev - 1);
+      } else if (gestureState.dx < -threshold || (gestureState.dx < -20 && velocity > 0.3)) {
+        // 左スワイプ：次のカードに進む
+        setCurrentIndex(prev => (prev + 1) % cards.length);
       }
       
       // アニメーションをリセット
       Animated.spring(pan, {
         toValue: { x: 0, y: 0 },
         useNativeDriver: false,
+        tension: 100,
+        friction: 8,
       }).start();
     },
   });
@@ -111,11 +150,11 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
       <View style={{ width: frameWidth, height: 179 }}>
         {getVisibleCards().map((card, index) => {
           const isTopCard = index === 0;
+          
           const animatedStyle = isTopCard
             ? {
                 transform: [
                   { translateX: pan.x },
-                  { translateY: pan.y },
                   { translateX: index * OFFSET_X },
                 ],
                 zIndex: MAX_VISIBLE_CARDS - index,
@@ -140,8 +179,13 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
             >
               <TouchableOpacity
                 style={styles.cardTouchable}
-                onPress={() => router.push(`/DiaryDetail?id=${card.id}`)}
-                activeOpacity={0.9}
+                onPress={() => {
+                  // Firebase IDを使用してルーティング
+                  const routeId = card.firebaseId || card.id.toString();
+                  console.log('Navigating to diaryDetail with ID:', routeId);
+                  router.push(`/diaryDetail?id=${routeId}&type=shared`);
+                }}
+                activeOpacity={0.7}
               >
                 <ImageBackground
                   source={{ uri: card.backgroundImage }}
@@ -162,6 +206,15 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
           );
         })}
       </View>
+      
+      {/* 滑动指示器 */}
+      {cards.length > 1 && (
+        <View style={styles.indicatorContainer}>
+          <Text style={styles.indicatorText}>
+            {currentIndex + 1} / {cards.length}
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -254,6 +307,23 @@ const styles = StyleSheet.create({
     color: '#bbb',
     marginTop: 4,
     textAlign: 'center',
+  },
+  indicatorContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 12,
+    marginRight: 20,
+  },
+  indicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginHorizontal: 3,
+  },
+  indicatorText: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '500',
   },
 });
 

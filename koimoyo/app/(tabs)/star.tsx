@@ -71,10 +71,20 @@ const loadDiaries = async () => {
     const snapshot = await getDocs(q);
       const diaries: DiaryCard[] = snapshot.docs.map((doc) => {
         const data = doc.data();
+        
+        // 権限の検証：ユーザーは作成者またはパートナーである必要がある
+        const hasAccess = data.authorId === currentUid || data.partnerUid === currentUid;
+        
+        if (!hasAccess) {
+          console.warn(`Access denied for diary ${doc.id}: user ${currentUid} is not author (${data.authorId}) or partner (${data.partnerUid})`);
+          return null; // 権限のない日記をスキップ
+        }
+        
         const dateObj = data.createdAt?.toDate();
         const formattedDate = dateObj
           ? `${dateObj.getFullYear()}/${dateObj.getMonth() + 1}/${dateObj.getDate()}`
           : '';
+          
         return {
           id: doc.id,
           title: data.title || '',
@@ -83,7 +93,7 @@ const loadDiaries = async () => {
           date: formattedDate,
           backgroundImage: data.images?.[0] || '',
         };
-      });
+      }).filter(diary => diary !== null); // null値をフィルタリング
       setCardsData(diaries);
     } catch (e) {
       Alert.alert('エラー', '日記の取得に失敗しました');

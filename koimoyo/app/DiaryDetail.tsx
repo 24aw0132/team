@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
 interface SharedDiary {
@@ -33,6 +33,45 @@ export default function DiaryDetail() {
   const { id, type } = useLocalSearchParams();
   const [sharedDiary, setSharedDiary] = useState<SharedDiary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasAccess, setHasAccess] = useState(false);
+
+  useEffect(() => {
+    if (type === 'shared') {
+      loadSharedDiary();
+    }
+  }, [id, type]);
+
+  // ユーザーアクセス権限の検証
+  const verifyAccess = async (diaryData: SharedDiary): Promise<boolean> => {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        Alert.alert('エラー', 'ログインが必要です');
+        return false;
+      }
+
+      const currentUid = currentUser.uid;
+      
+      // ユーザーが日記の作成者かどうかを確認
+      if (diaryData.authorId === currentUid) {
+        return true;
+      }
+
+      // ユーザーが作成者のパートナーかどうかを確認
+      if (diaryData.partnerUid === currentUid) {
+        return true;
+      }
+
+      // どちらにも該当しない場合はアクセス権限なし
+      Alert.alert('アクセス拒否', 'この日記にアクセスする権限がありません');
+      return false;
+      
+    } catch (error) {
+      console.error('Access verification error:', error);
+      Alert.alert('エラー', 'アクセス権限の確認に失敗しました');
+      return false;
+    }
+  };
 
   useEffect(() => {
     if (type === 'shared') {
@@ -46,11 +85,28 @@ export default function DiaryDetail() {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setSharedDiary({ ...data, id: docSnap.id } as SharedDiary);
+        const diaryData = { ...data, id: docSnap.id } as SharedDiary;
+        
+        // アクセス権限の検証
+        const accessGranted = await verifyAccess(diaryData);
+        setHasAccess(accessGranted);
+        
+        if (accessGranted) {
+          setSharedDiary(diaryData);
+        } else {
+          // 権限がない場合は前のページに戻る
+          setTimeout(() => {
+            router.back();
+          }, 2000);
+        }
+      } else {
+        Alert.alert('エラー', '日記が見つかりませんでした');
+        setHasAccess(false);
       }
     } catch (error) {
       console.error('共有日記読み込みエラー:', error);
       Alert.alert('エラー', '日記の読み込みに失敗しました');
+      setHasAccess(false);
     } finally {
       setLoading(false);
     }
@@ -80,6 +136,26 @@ export default function DiaryDetail() {
     return (
       <View style={styles.container}>
         <Text style={styles.loadingText}>読み込み中...</Text>
+      </View>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.accessDeniedContainer}>
+          <Ionicons name="lock-closed" size={50} color="#ff6b6b" />
+          <Text style={styles.accessDeniedTitle}>アクセス拒否</Text>
+          <Text style={styles.accessDeniedText}>
+            この日記にアクセスする権限がありません
+          </Text>
+          <TouchableOpacity 
+            style={styles.accessDeniedButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>戻る</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -274,5 +350,44 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 100,
     color: '#f44',
+  },
+  accessDeniedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  accessDeniedTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  accessDeniedText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 30,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  accessDeniedButton: {
+    backgroundColor: '#ff6b6b',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 3,
+    shadowColor: '#ff6b6b',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 });

@@ -6,6 +6,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { db, auth } from '../firebase';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 
 interface DiaryCard {
   id: number;
@@ -22,24 +24,97 @@ interface StackedCardsProps {
 }
 
 const OFFSET_X_RATIO = 46 / 400;
-const MAX_VISIBLE_CARDS = 3;
+const MAX_VISIBLE_CARDS = 6;
 
 const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
   const [cards, setCards] = useState<DiaryCard[]>([]);
-  const [favorites, setFavorites] = useState<string[]>([]); // 文字列配列に変更
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [cardOrder, setCardOrder] = useState<number[]>([]); // 卡片显示顺序
   const pan = useRef(new Animated.ValueXY()).current;
+  const [isAnimating, setIsAnimating] = useState(false);
   const router = useRouter();
+
+  // FirebaseとAsyncStorageからお気に入りデータを読み込み
+  const loadFavoritesFromFirebase = async () => {
+    try {
+      const currentUid = auth.currentUser?.uid;
+      if (!currentUid) {
+        return [];
+      }
+
+      // Firebaseからお気に入りデータを読み込み
+      const favoritesQuery = query(
+        collection(db, 'user_favorites'),
+        where('userId', '==', currentUid)
+      );
+      
+      const snapshot = await getDocs(favoritesQuery);
+      const firebaseFavorites = snapshot.docs.map(doc => {
+        const data = doc.data();
+        // 権限の検証：ユーザーがこれらのお気に入り日記にアクセス権限を持つことを確認
+        return data.diaryId;
+      });
+      
+      // AsyncStorageからローカルお気に入りデータもバックアップとして読み込み
+      const localFav = await AsyncStorage.getItem('favorite_ids');
+      const localFavorites = localFav ? JSON.parse(localFav) : [];
+      
+      // Firebaseとローカルのお気に入りデータをマージし、重複を除去
+      const combinedFavorites = [...new Set([...firebaseFavorites, ...localFavorites])];
+      
+      // 各お気に入りアイテムのアクセス権限を検証
+      const validatedFavorites = [];
+      for (const favoriteId of combinedFavorites) {
+        try {
+          // ユーザーがこの日記にアクセス権限を持つかを確認
+          const diaryRef = doc(db, 'shared_diaries', favoriteId);
+          const diarySnap = await getDoc(diaryRef);
+          
+          if (diarySnap.exists()) {
+            const diaryData = diarySnap.data();
+            const hasAccess = diaryData.authorId === currentUid || diaryData.partnerUid === currentUid;
+            
+            if (hasAccess) {
+              validatedFavorites.push(favoriteId);
+            } else {
+              console.warn(`Removing unauthorized favorite: ${favoriteId}`);
+            }
+          } else {
+            console.warn(`Diary not found, removing from favorites: ${favoriteId}`);
+          }
+        } catch (error) {
+          console.warn(`Error validating favorite ${favoriteId}:`, error);
+          // 検証に失敗した場合は、安全のためお気に入りから削除
+        }
+      }
+      
+      // 検証済みデータをAsyncStorageに保存
+      await AsyncStorage.setItem('favorite_ids', JSON.stringify(validatedFavorites));
+      
+      return validatedFavorites;
+      
+    } catch (e) {
+      console.error('Failed to load favorites from Firebase:', e);
+      // Firebase読み込みに失敗した場合、AsyncStorageから読み込みを試行
+      try {
+        const fav = await AsyncStorage.getItem('favorite_ids');
+        return fav ? JSON.parse(fav) : [];
+      } catch (localError) {
+        console.error('Failed to load local favorites:', localError);
+        return [];
+      }
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
       try {
         const saved = await AsyncStorage.getItem('diary_cards');
-        const savedFavorites = await AsyncStorage.getItem('favorite_ids');
+        const favoriteIds = await loadFavoritesFromFirebase(); // Firebaseデータを使用
         
-        if (saved && savedFavorites) {
+        if (saved && favoriteIds.length > 0) {
           const allCards: DiaryCard[] = JSON.parse(saved);
-          const favoriteIds: string[] = JSON.parse(savedFavorites); // 文字列配列に変更
           
           // お気に入りの日記のみをフィルタリング（firebaseIdまたはIDを文字列として比較）
           const favoriteCards = allCards.filter(card => {
@@ -49,6 +124,8 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
           
           setCards(favoriteCards);
           setFavorites(favoriteIds); // 文字列配列として保持
+          // カードの表示順序を初期化
+          setCardOrder(favoriteCards.map((_, index) => index));
         }
       } catch (e) {
         console.error('日記読み込み失敗:', e);
@@ -63,11 +140,10 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
       const loadData = async () => {
         try {
           const saved = await AsyncStorage.getItem('diary_cards');
-          const savedFavorites = await AsyncStorage.getItem('favorite_ids');
+          const favoriteIds = await loadFavoritesFromFirebase(); // Firebaseデータを使用
           
-          if (saved && savedFavorites) {
+          if (saved && favoriteIds.length > 0) {
             const allCards: DiaryCard[] = JSON.parse(saved);
-            const favoriteIds: string[] = JSON.parse(savedFavorites);
             
             const favoriteCards = allCards.filter(card => {
               const cardId = card.firebaseId || card.id.toString();
@@ -76,6 +152,8 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
             
             setCards(favoriteCards);
             setFavorites(favoriteIds);
+            // 重新初始化卡片显示顺序
+            setCardOrder(favoriteCards.map((_, index) => index));
           }
         } catch (e) {
           console.error('日記読み込み失敗:', e);
@@ -90,33 +168,60 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
 
   // スワイプジェスチャーの設定
   const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponder: () => !isAnimating,
     onMoveShouldSetPanResponder: (_, gestureState) => {
-      // 横向きのジェスチャーのみ反応
-      return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 10;
+      // 横向きのジェスチャーのみ反応し、縦方向は無視
+      return !isAnimating && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
     },
     onPanResponderMove: Animated.event([null, { dx: pan.x }], {
       useNativeDriver: false,
     }),
     onPanResponderRelease: (_, gestureState) => {
-      const threshold = 50;
-      const velocity = Math.abs(gestureState.vx);
+      if (isAnimating) return;
       
-      if (gestureState.dx > threshold || (gestureState.dx > 20 && velocity > 0.3)) {
-        // 右スワイプ：前のカードに戻る
-        setCurrentIndex(prev => prev === 0 ? cards.length - 1 : prev - 1);
-      } else if (gestureState.dx < -threshold || (gestureState.dx < -20 && velocity > 0.3)) {
-        // 左スワイプ：次のカードに進む
-        setCurrentIndex(prev => (prev + 1) % cards.length);
+      const threshold = 30;
+      const velocityThreshold = 0.2;
+      
+      if (gestureState.dx > threshold || gestureState.vx > velocityThreshold) {
+        // 右スワイプ：当前卡片移到队列最后
+        setIsAnimating(true);
+        const newOrder = [...cardOrder];
+        const currentCardIndex = newOrder.shift(); // 移除第一张卡片
+        if (currentCardIndex !== undefined) {
+          newOrder.push(currentCardIndex); // 添加到最后
+        }
+        setCardOrder(newOrder);
+        
+        Animated.timing(pan, {
+          toValue: { x: 0, y: 0 },
+          duration: 250,
+          useNativeDriver: false,
+        }).start(() => setIsAnimating(false));
+        
+      } else if (gestureState.dx < -threshold || gestureState.vx < -velocityThreshold) {
+        // 左スワイプ：将最后一张卡片移到前面
+        setIsAnimating(true);
+        const newOrder = [...cardOrder];
+        const lastCardIndex = newOrder.pop(); // 移除最后一张卡片
+        if (lastCardIndex !== undefined) {
+          newOrder.unshift(lastCardIndex); // 添加到最前面
+        }
+        setCardOrder(newOrder);
+        
+        Animated.timing(pan, {
+          toValue: { x: 0, y: 0 },
+          duration: 250,
+          useNativeDriver: false,
+        }).start(() => setIsAnimating(false));
+        
+      } else {
+        // 元の位置に戻る
+        Animated.timing(pan, {
+          toValue: { x: 0, y: 0 },
+          duration: 200,
+          useNativeDriver: false,
+        }).start();
       }
-      
-      // アニメーションをリセット
-      Animated.spring(pan, {
-        toValue: { x: 0, y: 0 },
-        useNativeDriver: false,
-        tension: 100,
-        friction: 8,
-      }).start();
     },
   });
 
@@ -135,15 +240,21 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
 
   // 表示するカードの範囲を計算
   const getVisibleCards = () => {
+    if (cardOrder.length === 0) return [];
+    
     const visibleCards = [];
-    for (let i = 0; i < Math.min(MAX_VISIBLE_CARDS, cards.length); i++) {
-      const cardIndex = (currentIndex + i) % cards.length;
-      visibleCards.push({ ...cards[cardIndex], stackIndex: i });
+    for (let i = 0; i < Math.min(MAX_VISIBLE_CARDS, cardOrder.length); i++) {
+      const originalCardIndex = cardOrder[i];
+      if (cards[originalCardIndex]) {
+        visibleCards.push({ 
+          ...cards[originalCardIndex], 
+          stackIndex: i,
+          originalIndex: originalCardIndex 
+        });
+      }
     }
     return visibleCards;
   };
-
-  // スクロール時のインデックス更新は不要になったので削除
 
   return (
     <View style={{ alignItems: 'flex-end' }}>
@@ -151,22 +262,24 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
         {getVisibleCards().map((card, index) => {
           const isTopCard = index === 0;
           
+          // より自然なスタック効果
+          const baseTranslateX = index * OFFSET_X;
+          
           const animatedStyle = isTopCard
             ? {
                 transform: [
-                  { translateX: pan.x },
-                  { translateX: index * OFFSET_X },
+                  { translateX: Animated.add(pan.x, baseTranslateX) },
                 ],
                 zIndex: MAX_VISIBLE_CARDS - index,
               }
             : {
-                transform: [{ translateX: index * OFFSET_X }],
+                transform: [{ translateX: baseTranslateX }],
                 zIndex: MAX_VISIBLE_CARDS - index,
               };
 
           return (
             <Animated.View
-              key={`${card.id}-${currentIndex}`}
+              key={`card-${card.originalIndex}-${currentIndex}`}
               style={[
                 styles.stackCard,
                 animatedStyle,
@@ -206,15 +319,6 @@ const StackedCards: React.FC<StackedCardsProps> = ({ frameWidth }) => {
           );
         })}
       </View>
-      
-      {/* 滑动指示器 */}
-      {cards.length > 1 && (
-        <View style={styles.indicatorContainer}>
-          <Text style={styles.indicatorText}>
-            {currentIndex + 1} / {cards.length}
-          </Text>
-        </View>
-      )}
     </View>
   );
 };
@@ -307,23 +411,6 @@ const styles = StyleSheet.create({
     color: '#bbb',
     marginTop: 4,
     textAlign: 'center',
-  },
-  indicatorContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 12,
-    marginRight: 20,
-  },
-  indicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginHorizontal: 3,
-  },
-  indicatorText: {
-    fontSize: 12,
-    color: '#999',
-    fontWeight: '500',
   },
 });
 

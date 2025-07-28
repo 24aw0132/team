@@ -50,9 +50,9 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
   const getIconName = () => {
     switch (type) {
       case 'success':
-        return 'checkmark-circle';
+        return 'sparkles'; // 更友好的成功图标
       case 'warning':
-        return 'warning';
+        return 'alert-circle';
       case 'error':
         return 'close-circle';
       default:
@@ -63,13 +63,26 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
   const getIconColor = () => {
     switch (type) {
       case 'success':
-        return '#4CAF50';
+        return '#8B5CF6'; // 紫色 - 优雅的成功色
       case 'warning':
-        return '#FF9800';
+        return '#F59E0B'; // 琥珀色 - 温和的警告色
       case 'error':
-        return '#F44336';
+        return '#F97316'; // 橙色 - 替代红色
       default:
-        return '#2196F3';
+        return '#06B6D4'; // 青色 - 现代感信息色
+    }
+  };
+
+  const getBackgroundColor = () => {
+    switch (type) {
+      case 'success':
+        return 'rgba(139, 92, 246, 0.1)'; // 紫色背景
+      case 'warning':
+        return 'rgba(245, 158, 11, 0.1)'; // 琥珀色背景
+      case 'error':
+        return 'rgba(249, 115, 22, 0.1)'; // 橙色背景
+      default:
+        return 'rgba(6, 182, 212, 0.1)'; // 青色背景
     }
   };
 
@@ -83,14 +96,14 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
       ]}
     >
       <BlurView intensity={80} tint="light" style={styles.blurContainer}>
-        <View style={styles.content}>
+        <View style={[styles.content, { backgroundColor: getBackgroundColor() }]}>
           <Ionicons 
             name={getIconName()} 
             size={24} 
             color={getIconColor()}
             style={styles.icon}
           />
-          <Text style={styles.message}>{message}</Text>
+          <Text style={[styles.message, { color: getIconColor() }]}>{message}</Text>
         </View>
       </BlurView>
     </Animated.View>
@@ -106,29 +119,29 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   blurContainer: {
-    borderRadius: 16,
+    borderRadius: 20, // 更圆润的边角
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 }, // 更深的阴影
+    shadowOpacity: 0.15, // 更柔和的阴影
+    shadowRadius: 12,
+    elevation: 12,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    padding: 18, // 更宽松的内边距
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   icon: {
-    marginRight: 12,
+    marginRight: 14, // 稍微增加图标间距
   },
   message: {
     flex: 1,
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-    lineHeight: 20,
+    fontSize: 15, // 稍微增大字体
+    fontWeight: '600', // 更粗的字体
+    lineHeight: 22,
   },
 });
 

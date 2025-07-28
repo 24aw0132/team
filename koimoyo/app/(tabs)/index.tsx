@@ -18,6 +18,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import NotificationBell from "../../components/NotificationBell";
+import FloatingEmojiButton from "../../components/FloatingEmojiButton";
 
 export default function App() {
   const router = useRouter();
@@ -163,6 +164,9 @@ export default function App() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* 悬浮 Emoji 按钮 - 只有当用户已登录时显示 */}
+      {currentUser && <FloatingEmojiButton />}
     </SafeAreaView>
   );
 }

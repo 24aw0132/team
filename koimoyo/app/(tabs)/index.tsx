@@ -17,6 +17,7 @@ import { auth, db } from "../../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
+import NotificationBell from "../../components/NotificationBell";
 
 export default function App() {
   const router = useRouter();
@@ -106,6 +107,9 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          {currentUser && <NotificationBell />}
+        </View>
         <Text style={styles.logo}>❤️こいもよう</Text>
         <TouchableOpacity 
           onPress={currentUser ? navigateToProfile : navigateToLogin}
@@ -175,6 +179,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  headerLeft: {
+    width: 40,
+    alignItems: 'flex-start',
   },
   logo: {
     fontSize: 20,

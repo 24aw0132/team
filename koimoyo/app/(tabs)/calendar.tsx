@@ -1,47 +1,143 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Image,
-  Modal,
-  FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { cardsData, DiaryCard } from './diaryData';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { db, auth } from '../../firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
-const EMOJI_IMAGES = [
-require('../../assets/emojis/expressionless_face_3d.png'),
-  require('../../assets/emojis/eye_3d.png'),
-  require('../../assets/emojis/eye_in_speech_bubble_3d.png'),
-  require('../../assets/emojis/eyes_3d.png'),
-  require('../../assets/emojis/face_blowing_a_kiss_3d.png'),
-  require('../../assets/emojis/face_exhaling_3d.png'),
-  require('../../assets/emojis/face_holding_back_tears_3d.png'),
-  require('../../assets/emojis/face_in_clouds_3d.png'),
-  require('../../assets/emojis/face_savoring_food_3d.png'),
-  require('../../assets/emojis/face_screaming_in_fear_3d.png'),
-  require('../../assets/emojis/face_vomiting_3d.png'),
-  require('../../assets/emojis/face_with_diagonal_mouth_3d.png'),
-  require('../../assets/emojis/face_with_hand_over_mouth_3d.png'),
-  require('../../assets/emojis/face_with_head-bandage_3d.png'),
-  require('../../assets/emojis/face_with_medical_mask_3d.png'),
-  require('../../assets/emojis/face_with_monocle_3d.png'),
-  require('../../assets/emojis/face_with_open_eyes_and_hand_over_mouth_3d.png'),
-  require('../../assets/emojis/face_with_open_mouth_3d.png'),
-  require('../../assets/emojis/face_with_peeking_eye_3d.png'),
-  require('../../assets/emojis/face_with_raised_eyebrow_3d.png'),
-  require('../../assets/emojis/face_with_rolling_eyes_3d.png'),
-  require('../../assets/emojis/face_with_spiral_eyes_3d.png'),
-  require('../../assets/emojis/face_with_steam_from_nose_3d.png'),
-  require('../../assets/emojis/face_with_symbols_on_mouth_3d.png'),
-  require('../../assets/emojis/face_with_tears_of_joy_3d.png'),
-  require('../../assets/emojis/face_with_thermometer_3d.png'),
-  require('../../assets/emojis/face_with_tongue_3d.png'),
-  require('../../assets/emojis/face_without_mouth_3d.png'),
-];
+// Firebase日记数据结构
+interface FirebaseDiary {
+  id: string;
+  title: string;
+  content: string;
+  mood: string;
+  weather: string;
+  images: string[];
+  authorId: string;
+  authorNickname: string;
+  partnerUid: string;
+  createdAt: any;
+  isShared: boolean;
+  location?: string;
+}
+
+// 天气数据结构
+interface WeatherData {
+  type: string;
+  icon: string;
+  temp: string;
+  humidity: string;
+  location: string;
+}
+
+// 获取日本实时天气数据
+const getJapanWeatherData = async (): Promise<WeatherData> => {
+  try {
+    // 使用免费的Open-Meteo API获取东京天气
+    const lat = 35.6762; // 东京纬度
+    const lon = 139.6503; // 东京经度
+    
+    // 获取今天的天气
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    
+    // 使用Open-Meteo API（无需API密钥）
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max,temperature_2m_min,relative_humidity_2m_max&timezone=Asia/Tokyo&start_date=${dateStr}&end_date=${dateStr}`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (response.ok && data.daily) {
+      const daily = data.daily;
+      const weatherCode = daily.weathercode[0];
+      const maxTemp = daily.temperature_2m_max[0];
+      const minTemp = daily.temperature_2m_min[0];
+      const humidity = daily.relative_humidity_2m_max[0];
+      
+      return {
+        type: getWeatherDescription(weatherCode),
+        icon: getWeatherIconFromCode(weatherCode),
+        temp: `${Math.round(maxTemp)}°C`,
+        humidity: `${humidity}%`,
+        location: '東京'
+      };
+    } else {
+      // API失败时返回模拟数据
+      return getSimulatedWeatherData();
+    }
+  } catch (error) {
+    console.error('Weather API error:', error);
+    // 网络错误时返回模拟数据
+    return getSimulatedWeatherData();
+  }
+};
+
+// 根据天气代码获取天气描述（日语）
+const getWeatherDescription = (code: number): string => {
+  const weatherDescriptions: { [key: number]: string } = {
+    0: '快晴',
+    1: '晴れ',
+    2: '薄曇り',
+    3: '曇り',
+    45: '霧',
+    48: '霧氷',
+    51: '小雨',
+    53: '雨',
+    55: '大雨',
+    56: '凍雨',
+    57: '凍雨',
+    61: '小雨',
+    63: '雨',
+    65: '大雨',
+    66: '凍雨',
+    67: '凍雨',
+    71: '小雪',
+    73: '雪',
+    75: '大雪',
+    77: '雪',
+    80: 'にわか雨',
+    81: 'にわか雨',
+    82: '激しいにわか雨',
+    85: 'にわか雪',
+    86: '激しいにわか雪',
+    95: '雷雨',
+    96: '雷雨',
+    99: '激しい雷雨'
+  };
+  return weatherDescriptions[code] || '不明';
+};
+
+// 根据天气代码获取图标
+const getWeatherIconFromCode = (code: number): string => {
+  if (code === 0 || code === 1) return 'sunny-outline';
+  if (code === 2 || code === 3) return 'cloudy-outline';
+  if (code >= 45 && code <= 48) return 'cloudy-outline';
+  if (code >= 51 && code <= 67) return 'rainy-outline';
+  if (code >= 71 && code <= 77) return 'snow-outline';
+  if (code >= 80 && code <= 82) return 'rainy-outline';
+  if (code >= 85 && code <= 86) return 'snow-outline';
+  if (code >= 95 && code <= 99) return 'thunderstorm-outline';
+  return 'cloudy-outline';
+};
+
+// 模拟天气数据（API失败时使用）
+const getSimulatedWeatherData = (): WeatherData => {
+  const weatherTypes = [
+    { type: '晴れ', icon: 'sunny-outline', temp: '25°C', humidity: '45%', location: '東京' },
+    { type: '曇り', icon: 'cloudy-outline', temp: '22°C', humidity: '60%', location: '東京' },
+    { type: '雨', icon: 'rainy-outline', temp: '18°C', humidity: '80%', location: '東京' },
+    { type: '雪', icon: 'snow-outline', temp: '2°C', humidity: '70%', location: '東京' },
+  ];
+  return weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
+};
 
 const WEEK_DAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -57,33 +153,129 @@ export default function Calendar() {
   const today = new Date();
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [isEmojiModalVisible, setIsEmojiModalVisible] = useState(false);
-  const [emojiSelections, setEmojiSelections] = useState<Record<string, any>>({}); // 日付ごとの絵文字画像
+  
+  // Firebase相关状态
+  const [diaries, setDiaries] = useState<FirebaseDiary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  // 天气相关状态
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [loadingWeather, setLoadingWeather] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const dates = generateDates(year, month);
   const navigation = useNavigation<NavigationProp<any>>();
+  const router = useRouter();
 
+  // 监听用户认证状态
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setCurrentUser(user);
+      if (user) {
+        loadUserDiaries(user.uid);
+      } else {
+        setDiaries([]);
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 当选择日期时加载天气数据
+  useEffect(() => {
+    if (selectedDate) {
+      loadWeatherForDate();
+    }
+  }, [selectedDate]);
+
+  // 获取当前选中日期的天气数据
+  const loadWeatherForDate = async () => {
+    setLoadingWeather(true);
+    try {
+      const weather = await getJapanWeatherData();
+      setWeatherData(weather);
+    } catch (error) {
+      console.error('Error loading weather:', error);
+      setWeatherData(null);
+    } finally {
+      setLoadingWeather(false);
+    }
+  };
+
+  // 加载用户日记
+  const loadUserDiaries = (userId: string) => {
+    setLoading(true);
+    try {
+      // 查询用户的共享日记（暂时移除orderBy以避免索引问题）
+      const diariesQuery = query(
+        collection(db, 'shared_diaries'),
+        where('authorId', '==', userId)
+      );
+
+      const unsubscribe = onSnapshot(diariesQuery, (snapshot) => {
+        const userDiaries: FirebaseDiary[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          userDiaries.push({
+            id: doc.id,
+            title: data.title || '無題',
+            content: data.content || '',
+            mood: data.mood || '😊',
+            weather: data.weather || '☀️',
+            images: (data.images || []).filter((img: string) => img && img.trim() !== ''),
+            authorId: data.authorId,
+            authorNickname: data.authorNickname || 'ユーザー',
+            partnerUid: data.partnerUid || '',
+            createdAt: data.createdAt,
+            isShared: data.isShared || false,
+            location: data.location || '場所未設定',
+          });
+        });
+        
+        // 在客户端进行排序
+        userDiaries.sort((a, b) => {
+          if (!a.createdAt || !b.createdAt) return 0;
+          const dateA = a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+          const dateB = b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+          return dateB.getTime() - dateA.getTime();
+        });
+        
+        setDiaries(userDiaries);
+        setLoading(false);
+      }, (error) => {
+        console.error('日記の読み込みに失敗:', error);
+        setLoading(false);
+      });
+
+      return unsubscribe;
+    } catch (error) {
+      console.error('クエリエラー:', error);
+      setLoading(false);
+    }
+  };
+
+  // 日付を文字列に変換する関数
   const formatDateString = (y: number, m: number, d: number) => {
     return `${y}/${(m + 1).toString().padStart(2, '0')}/${d.toString().padStart(2, '0')}`;
   };
 
-  const diaryForSelectedDate: DiaryCard[] = selectedDate
-    ? cardsData.filter(card => card.date === selectedDate)
+  // Firebase Timestampを日付文字列に変換
+  const formatFirebaseDate = (timestamp: any) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
+  };
+
+  // 選択された日付の日記を取得
+  const diaryForSelectedDate: FirebaseDiary[] = selectedDate
+    ? diaries.filter(diary => formatFirebaseDate(diary.createdAt) === selectedDate)
     : [];
 
-  const diaryDatesSet = new Set(cardsData.map(card => card.date));
-
-  const handleEmojiSelect = (emojiImage: any) => {
-    if (selectedDate) {
-      setEmojiSelections(prev => ({
-        ...prev,
-        [selectedDate]: emojiImage,
-      }));
-    }
-    setIsEmojiModalVisible(false);
-  };
+  // 日記がある日付のセットを作成
+  const diaryDatesSet = new Set(diaries.map(diary => formatFirebaseDate(diary.createdAt)));
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 40, backgroundColor: '#FEF9FB', flexGrow: 1 }}>
@@ -113,7 +305,6 @@ export default function Calendar() {
             const dateStr = day ? formatDateString(year, month, day) : '';
             const isSelected = selectedDate === dateStr;
             const hasDiary = diaryDatesSet.has(dateStr);
-            const emojiImage = emojiSelections[dateStr];
 
             return (
               <TouchableOpacity
@@ -124,9 +315,6 @@ export default function Calendar() {
               >
                 <View style={styles.innerCircle}>
                   <Text style={styles.dateText}>{day ?? ''}</Text>
-                  {emojiImage && (
-                    <Image source={emojiImage} style={{ width: 18, height: 18, position: 'absolute', top: -4, right: -4 }} />
-                  )}
                   {hasDiary && <Text style={styles.pencilMark}>✏️</Text>}
                 </View>
               </TouchableOpacity>
@@ -134,87 +322,101 @@ export default function Calendar() {
           })}
         </View>
 
-        {/* 絵文字ボタンまたは選択済み絵文字表示 */}
-{selectedDate && (
-  emojiSelections[selectedDate] ? (
-    <TouchableOpacity
-      onPress={() => setIsEmojiModalVisible(true)}
-      style={[styles.selectedEmojiContainer]}
-      activeOpacity={0.8}
-    >
-      <Text style={styles.selectedEmojiLabel}>今日の気持ち</Text>
-      <Image source={emojiSelections[selectedDate]} style={styles.selectedEmojiImage} />
-    </TouchableOpacity>
-  ) : (
-    <TouchableOpacity
-      style={styles.emojiButton}
-      onPress={() => setIsEmojiModalVisible(true)}
-    >
-      <Text style={styles.emojiButtonText}>今日の気持ちを絵文字で記録！</Text>
-    </TouchableOpacity>
-  )
-)}
-        {/* 日記表示 */}
-        <View style={styles.diaryContainer}>
-          {selectedDate ? (
-            diaryForSelectedDate.length > 0 ? (
-              diaryForSelectedDate.map(card => (
-                <TouchableOpacity
-                  key={card.id}
-                  style={styles.card}
-                  onPress={() =>
-                    navigation.navigate('DiaryDetail', { ...card })
-                  }
-                >
-                  <Image source={{ uri: card.backgroundImage }} style={styles.diaryImage} />
-                  <Text style={styles.title}>{card.title}</Text>
-                  <Text style={styles.location}>{card.location}</Text>
-                  <Text style={styles.date}>{card.date}</Text>
-                  <Text style={styles.content} numberOfLines={2}>{card.content}</Text>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={styles.noDiaryText}>この日に日記はありません</Text>
-            )
+        {/* 天气和日记显示 */}
+        <View style={styles.contentContainer}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FF84A7" />
+              <Text style={styles.loadingText}>日記を読み込み中...</Text>
+            </View>
+          ) : !currentUser ? (
+            <View style={styles.selectDatePrompt}>
+              <Text style={styles.promptEmoji}>🔐</Text>
+              <Text style={styles.promptText}>ログインが必要です</Text>
+              <Text style={styles.promptSubText}>日記を表示するにはログインしてください</Text>
+            </View>
+          ) : selectedDate ? (
+            <>
+              {/* 天气显示 */}
+              {weatherData && (
+                <View style={styles.weatherCard}>
+                  <View style={styles.weatherHeader}>
+                    <Ionicons name={weatherData.icon as any} size={36} color="#FF84A7" />
+                    <View style={styles.weatherInfo}>
+                      <Text style={styles.weatherTemp}>{weatherData.temp}</Text>
+                      <Text style={styles.weatherDesc}>{weatherData.type}</Text>
+                      <Text style={styles.weatherHumidity}>湿度: {weatherData.humidity}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.weatherDate}>{selectedDate}の天気 ({weatherData.location})</Text>
+                </View>
+              )}
+
+              {loadingWeather && (
+                <View style={styles.weatherLoadingCard}>
+                  <ActivityIndicator size="small" color="#FF84A7" />
+                  <Text style={styles.weatherLoadingText}>天気情報を取得中...</Text>
+                </View>
+              )}
+
+              {/* 日记列表（缩略版） */}
+              <View style={styles.diarySection}>
+                <Text style={styles.sectionTitle}>
+                  📝 この日の日記 ({diaryForSelectedDate.length}件)
+                </Text>
+                {diaryForSelectedDate.length > 0 ? (
+                  diaryForSelectedDate.map(diary => (
+                    <TouchableOpacity
+                      key={diary.id}
+                      style={styles.compactCard}
+                      onPress={() => {
+                        router.push({
+                          pathname: '/diaryDetail',
+                          params: { 
+                            id: diary.id,
+                            type: 'shared'
+                          }
+                        } as any);
+                      }}
+                    >
+                      <View style={styles.cardContent}>
+                        <Text style={styles.compactTitle}>{diary.title}</Text>
+                        <Text style={styles.compactLocation}>📍 {diary.location}</Text>
+                        <Text style={styles.compactContent} numberOfLines={2}>
+                          {diary.content}
+                        </Text>
+                        <View style={styles.compactMoodWeather}>
+                          <Text style={styles.compactEmoji}>{diary.mood}</Text>
+                          <Text style={styles.compactEmoji}>{diary.weather}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.cardArrow}>
+                        <Text style={styles.arrowText}>→</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.noDiaryCard}>
+                    <Text style={styles.noDiaryText}>この日に日記はありません</Text>
+                    <Text style={styles.noDiarySubText}>日記を書いてみませんか？</Text>
+                  </View>
+                )}
+              </View>
+            </>
           ) : (
-            <Text style={styles.noDiaryText}>日付を選択してください</Text>
+            <View style={styles.selectDatePrompt}>
+              <Text style={styles.promptEmoji}>📅</Text>
+              <Text style={styles.promptText}>日付を選択してください</Text>
+              <Text style={styles.promptSubText}>天気と日記を確認できます</Text>
+            </View>
           )}
         </View>
-
-        {/* モーダル：絵文字選択 */}
-        <Modal
-          visible={isEmojiModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setIsEmojiModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>今日の気持ちを選んでね</Text>
-              <FlatList
-                data={EMOJI_IMAGES}
-                numColumns={5}
-                keyExtractor={(_, index) => index.toString()}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.emojiItem}
-                    onPress={() => handleEmojiSelect(item)}
-                  >
-                    <Image source={item} style={styles.emojiImage} />
-                  </TouchableOpacity>
-                )}
-              />
-              <TouchableOpacity style={styles.modalCloseButton} onPress={() => setIsEmojiModalVisible(false)}>
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>キャンセル</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
 
       </View>
     </ScrollView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
@@ -271,18 +473,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  todayCircle: {
-    backgroundColor: '#FF84A7',
-    borderRadius: 18,
-  },
   dateText: {
     fontSize: 16,
     textAlign: 'center',
     color: '#000',
-  },
-  todayText: {
-    color: '#fff',
-    fontWeight: 'bold',
   },
   pencilMark: {
     position: 'absolute',
@@ -290,134 +484,169 @@ const styles = StyleSheet.create({
     left: 2,
     fontSize: 12,
   },
-  emojiButton: {
-    backgroundColor: '#FF84A7',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+  contentContainer: {
+    marginTop: 20,
+    width: '100%',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  selectDatePrompt: {
+    alignItems: 'center',
+    marginTop: 40,
+    padding: 20,
+    backgroundColor: '#fff',
     borderRadius: 16,
-    marginBottom: 8,
-    shadowColor: '#FFAABF',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 3,
   },
-  emojiButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-    textAlign: 'center',
+  promptEmoji: {
+    fontSize: 48,
+    marginBottom: 10,
   },
-  emojiButtonRight: {
-    alignSelf: 'flex-end',
-    marginRight: 16,
-  },
-  emojiButtonCenter: {
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 16,
-  },
-  diaryContainer: {
-    marginTop: -10,
-    width: '100%',
-    paddingHorizontal: 10,
-    zIndex: -999,
-  },
-  card: {
-    backgroundColor: '#FFF0F6',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  diaryImage: {
-    width: '100%',
-    height: 180,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  title: {
+  promptText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FF4D6D',
+    color: '#333',
+    marginBottom: 5,
   },
-  location: {
+  promptSubText: {
     fontSize: 14,
     color: '#666',
-    marginVertical: 4,
+    textAlign: 'center',
   },
-  date: {
-    fontSize: 12,
-    color: '#999',
+  weatherCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  content: {
-    marginTop: 8,
-    fontSize: 14,
+  weatherHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  weatherInfo: {
+    flex: 1,
+  },
+  weatherTemp: {
+    fontSize: 20,
+    fontWeight: 'bold',
     color: '#333',
   },
-  noDiaryText: {
-    textAlign: 'center',
-    marginTop: 40,
+  weatherDesc: {
     fontSize: 16,
+    color: '#666',
+    marginBottom: 2,
+  },
+  weatherHumidity: {
+    fontSize: 14,
     color: '#999',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  weatherDate: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
   },
-  modalContent: {
+  weatherLoadingCard: {
     backgroundColor: '#fff',
-    width: '80%',
-    borderRadius: 12,
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 18,
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  weatherLoadingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  diarySection: {
+    width: '100%',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  compactCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  compactTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  compactLocation: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 4,
+  },
+  compactContent: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  compactMoodWeather: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  compactEmoji: {
+    fontSize: 16,
+  },
+  cardArrow: {
+    marginLeft: 8,
+  },
+  arrowText: {
+    fontSize: 18,
+    color: '#FF84A7',
     fontWeight: 'bold',
   },
-  emojiItem: {
-    margin: 6,
-    width: 56,
-    height: 56,
-    justifyContent: 'center',
+  noDiaryCard: {
+    backgroundColor: '#f8f8f8',
+    borderRadius: 12,
+    padding: 20,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    overflow: 'hidden',
   },
-  emojiImage: {
-    width: 40,
-    height: 40,
-    resizeMode: 'contain',
+  noDiaryText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 4,
   },
-  modalCloseButton: {
-    marginTop: 20,
-    backgroundColor: '#FF84A7',
-    paddingHorizontal: 30,
-    paddingVertical: 8,
-    borderRadius: 20,
+  noDiarySubText: {
+    fontSize: 14,
+    color: '#999',
   },
-  selectedEmojiContainer: {
-  alignItems: 'center',
-  padding: 8,
-  backgroundColor: '#FFE2EC',
-  borderRadius: 16,
-  flexDirection: 'row',
-  gap: 8,
-},
-selectedEmojiLabel: {
-  fontSize: 14,
-  color: '#333',
-  fontWeight: 'bold',
-},
-selectedEmojiImage: {
-  width: 32,
-  height: 32,
-  resizeMode: 'contain',
-},
-
 });

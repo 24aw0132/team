@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Alert, Image, ImageBackground, Modal, SafeAreaView
+  StyleSheet, Alert, Image, Modal, SafeAreaView, Dimensions,
+  Platform
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
 import {
@@ -10,11 +12,13 @@ import {
   query, where, getDocs
 } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uploadToCloudinary from '../utils/cloudinary';
+
+const { width, height } = Dimensions.get('window');
 
 export default function Mypage() {
   const [email, setEmail] = useState('');
@@ -195,6 +199,9 @@ export default function Mypage() {
 
       Alert.alert('成功', `${partnerData.nickname || '相手'}さんとペアリングしました`);
       setPartnerInput('');
+      setPairModalVisible(false);
+      setIsPaired(true);
+      setPartnerId(partnerData.userId);
     } catch (e) {
       Alert.alert('エラー', 'ペアリングに失敗しました');
     }
@@ -222,12 +229,12 @@ export default function Mypage() {
 
   const handleUnpair = async () => {
     Alert.alert(
-      '配对解除确认',
-      '确定要解除与对方的配对吗？',
+      '配対解除確認',
+      '確定要解除与对方的配對吗？',
       [
         { text: '取消', style: 'cancel' },
         {
-          text: '确定',
+          text: '確定',
           onPress: async () => {
             try {
               // 解除自己的配对
@@ -253,9 +260,9 @@ export default function Mypage() {
               setPartnerInfo(null);
               await AsyncStorage.removeItem(PARTNER_UID_KEY);
               
-              Alert.alert('成功', '配对已解除');
+              Alert.alert('成功', '配対已解除');
             } catch (error) {
-              Alert.alert('エラー', '解除配对失败');
+              Alert.alert('エラー', '解除配対失败');
             }
           }
         }
@@ -263,73 +270,95 @@ export default function Mypage() {
     );
   };
 
-  // 在 mypage.tsx 中添加重置功能（仅用于开发测试）
-  const resetIntroStatus = async () => {
-    try {
-      await AsyncStorage.removeItem('INTRO_SEEN');
-      Alert.alert('重置完成', '下次启动将显示引导页');
-    } catch (error) {
-      console.error('Error resetting intro status:', error);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
+      {/* 背景装饰元素 */}
+      <View style={styles.backgroundDecoration}>
+        <View style={styles.gradientCircle1} />
+        <View style={styles.gradientCircle2} />
+        <View style={styles.gradientCircle3} />
+      </View>
+
       {isLoggedIn ? (
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* 背景图区域 - 放大并包含返回按钮 */}
-          <View style={styles.profileSection}>
-            <ImageBackground
-              source={backgroundUrl ? { uri: backgroundUrl } : require('../assets/images/bg1.png')}
-              style={styles.backgroundImage}
-              resizeMode="cover"
-            >
-              {/* 返回按钮直接放在背景图上 */}
-              <TouchableOpacity style={styles.backButtonOnBg} onPress={handleBack}>
-                <MaterialIcons name="arrow-back" size={24} color="#fff" />
-              </TouchableOpacity>
-              
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* 头部区域 */}
+          <View style={styles.headerSection}>
+            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+              <Ionicons name="arrow-back" size={24} color="#2D3748" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>マイページ</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+
+          {/* 用户信息卡片 */}
+          <View style={styles.profileCard}>
+            {/* 背景照片区域 */}
+            <View style={styles.backgroundImageContainer}>
+              {backgroundUrl ? (
+                <Image
+                  source={{ uri: backgroundUrl }}
+                  style={styles.backgroundImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <LinearGradient
+                  colors={['#8BB6DB', '#F7A8B8']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.backgroundImage}
+                />
+              )}
               <TouchableOpacity 
-                style={styles.backgroundTouchable} 
+                style={styles.backgroundEditButton} 
                 onPress={() => handlePickImage('background')}
-              />
-              <TouchableOpacity style={styles.editBackgroundButton} onPress={() => handlePickImage('background')}>
-                <MaterialIcons name="edit" size={20} color="#fff" />
+              >
+                <Ionicons name="camera" size={16} color="#fff" />
               </TouchableOpacity>
-            </ImageBackground>
-            
-            {/* 头像和用户ID区域 */}
-            <View style={styles.avatarContainer}>
-              <TouchableOpacity onPress={() => handlePickImage('avatar')}>
+              {/* 渐变遮罩 */}
+              <LinearGradient
+                colors={['transparent', 'rgba(255, 255, 255, 0.4)']}
+                style={styles.backgroundGradient}
+              />
+            </View>
+
+            {/* 头像和用户信息区域 */}
+            <View style={styles.profileContentContainer}>
+              {/* 头像区域 */}
+              <TouchableOpacity onPress={() => handlePickImage('avatar')} style={styles.avatarContainer}>
                 <Image
                   source={avatarUrl ? { uri: avatarUrl } : require('../assets/avatar.png')}
                   style={styles.avatar}
                 />
                 <View style={styles.avatarEditIcon}>
-                  <MaterialIcons name="camera-alt" size={18} color="#666" />
+                  <Ionicons name="camera" size={16} color="#8BB6DB" />
                 </View>
               </TouchableOpacity>
               
-              {/* 用户ID显示在头像下方 */}
+              <Text style={styles.userName}>{nickname || 'ユーザー'}</Text>
+              
               <TouchableOpacity style={styles.userIdDisplay} onPress={handleCopyUserId}>
                 <Text style={styles.userIdText}>ID: {userId}</Text>
-                <MaterialIcons name="content-copy" size={16} color="#999" style={styles.copyIcon} />
+                <Ionicons name="copy-outline" size={16} color="#8BB6DB" style={styles.copyIcon} />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* 基本信息卡片 - 移除用户ID部分 */}
-          <View style={styles.card}>
+          {/* 基本信息卡片 */}
+          <View style={styles.infoCard}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>基本情報</Text>
               <TouchableOpacity 
                 style={styles.editButton} 
                 onPress={isEditing ? handleSave : () => setIsEditing(true)}
               >
-                <MaterialIcons 
-                  name={isEditing ? "check" : "edit"} 
-                  size={20} 
-                  color={isEditing ? "#4CAF50" : "#666"} 
+                <Ionicons 
+                  name={isEditing ? "checkmark" : "pencil"} 
+                  size={18} 
+                  color={isEditing ? "#4CAF50" : "#8BB6DB"} 
                 />
                 <Text style={[styles.editButtonText, isEditing && styles.saveButtonText]}>
                   {isEditing ? '保存' : '編集'}
@@ -337,66 +366,79 @@ export default function Mypage() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>ニックネーム</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.infoInput}
-                  value={nickname}
-                  onChangeText={setNickname}
-                  placeholder="ニックネームを入力"
-                />
-              ) : (
-                <Text style={styles.infoText}>{nickname || '未設定'}</Text>
-              )}
-            </View>
+            <View style={styles.infoGroup}>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>ニックネーム</Text>
+                {isEditing ? (
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="person-outline" size={18} color="#8BB6DB" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      value={nickname}
+                      onChangeText={setNickname}
+                      placeholder="ニックネームを入力"
+                      placeholderTextColor="#A0AEC0"
+                    />
+                  </View>
+                ) : (
+                  <Text style={styles.infoText}>{nickname || '未設定'}</Text>
+                )}
+              </View>
 
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>メールアドレス</Text>
-              <Text style={styles.infoText}>{email}</Text>
-            </View>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>メールアドレス</Text>
+                <Text style={styles.infoText}>{email}</Text>
+              </View>
 
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>誕生日</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.infoInput}
-                  value={birthday}
-                  onChangeText={setBirthday}
-                  placeholder="YYYY/MM/DD"
-                />
-              ) : (
-                <Text style={styles.infoText}>{birthday || '未設定'}</Text>
-              )}
-            </View>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>誕生日</Text>
+                {isEditing ? (
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="calendar-outline" size={18} color="#8BB6DB" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      value={birthday}
+                      onChangeText={setBirthday}
+                      placeholder="YYYY/MM/DD"
+                      placeholderTextColor="#A0AEC0"
+                    />
+                  </View>
+                ) : (
+                  <Text style={styles.infoText}>{birthday || '未設定'}</Text>
+                )}
+              </View>
 
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>趣味</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.infoInput}
-                  value={hobby}
-                  onChangeText={setHobby}
-                  placeholder="趣味を入力"
-                />
-              ) : (
-                <Text style={styles.infoText}>{hobby || '未設定'}</Text>
-              )}
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>趣味</Text>
+                {isEditing ? (
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="heart-outline" size={18} color="#8BB6DB" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      value={hobby}
+                      onChangeText={setHobby}
+                      placeholder="趣味を入力"
+                      placeholderTextColor="#A0AEC0"
+                    />
+                  </View>
+                ) : (
+                  <Text style={styles.infoText}>{hobby || '未設定'}</Text>
+                )}
+              </View>
             </View>
           </View>
 
           {/* 配对状态卡片 */}
-          <View style={styles.card}>
+          <View style={styles.pairCard}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>❤️ ペアリング状態</Text>
+              <Text style={styles.cardTitle}>💕 ペアリング</Text>
             </View>
 
             {isPaired ? (
-              // 已配对状态
               <View style={styles.pairedContainer}>
                 <View style={styles.pairedStatus}>
-                  <MaterialIcons name="favorite" size={24} color="#FF6B6B" />
-                  <Text style={styles.pairedText}>配对中</Text>
+                  <Ionicons name="heart" size={24} color="#F7A8B8" />
+                  <Text style={styles.pairedText}>配対中</Text>
                 </View>
                 <TouchableOpacity 
                   style={styles.partnerInfoButton} 
@@ -411,57 +453,93 @@ export default function Mypage() {
                       <Text style={styles.partnerName}>{partnerInfo?.nickname || 'パートナー'}</Text>
                       <Text style={styles.partnerUserId}>ID: {partnerId}</Text>
                     </View>
-                    <MaterialIcons name="chevron-right" size={24} color="#ccc" />
+                    <Ionicons name="chevron-forward" size={20} color="#A0AEC0" />
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.unpairButton} onPress={handleUnpair}>
-                  <Text style={styles.unpairButtonText}>配对解除</Text>
+                  <Text style={styles.unpairButtonText}>配対解除</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              // 未配对状态
               <View style={styles.unpairedContainer}>
                 <View style={styles.unpairedStatus}>
-                  <MaterialIcons name="heart-broken" size={24} color="#ccc" />
-                  <Text style={styles.unpairedText}>未配对</Text>
+                  <Ionicons name="heart-dislike-outline" size={24} color="#A0AEC0" />
+                  <Text style={styles.unpairedText}>未配対</Text>
                 </View>
                 <TouchableOpacity 
                   style={styles.pairButton} 
                   onPress={() => setPairModalVisible(true)}
                 >
-                  <MaterialIcons name="link" size={20} color="#fff" />
-                  <Text style={styles.pairButtonText}>パートナーと配对する</Text>
+                  <Ionicons name="link" size={20} color="#fff" />
+                  <Text style={styles.pairButtonText}>パートナーと配対する</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
 
-          {/* 设置按钮组 */}
-          <View style={styles.settingsCard}>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <MaterialIcons name="save" size={20} color="#fff" />
-              <Text style={styles.saveButtonText2}>情報を保存</Text>
-            </TouchableOpacity>
+          {/* 操作按钮组 */}
+          <View style={styles.actionSection}>
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <MaterialIcons name="logout" size={20} color="#fff" />
+              <Ionicons name="log-out-outline" size={20} color="#fff" />
               <Text style={styles.logoutButtonText}>ログアウト</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       ) : (
-        // 未登录时显示简化版本
+        // 未登录状态
         <View style={styles.unloggedContainer}>
           <View style={styles.unloggedContent}>
-            <MaterialIcons name="account-circle" size={100} color="#ccc" />
+            <View style={styles.unloggedIconContainer}>
+              <Ionicons name="person-circle-outline" size={100} color="#A0AEC0" />
+            </View>
             <Text style={styles.unloggedTitle}>ログインが必要です</Text>
-            <Text style={styles.unloggedSubtitle}>マイページを利用するにはログインしてください</Text>
+            <Text style={styles.unloggedSubtitle}>マイページを利用するには{'\n'}ログインしてください</Text>
             <TouchableOpacity style={styles.bottomLoginButton} onPress={() => setLoginModalVisible(true)}>
-              <MaterialIcons name="login" size={20} color="#fff" />
+              <Ionicons name="log-in-outline" size={20} color="#fff" />
               <Text style={styles.bottomLoginButtonText}>ログイン</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
+
+      {/* 配对输入弹窗 */}
+      <Modal
+        visible={pairModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setPairModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>パートナーと配対</Text>
+            <Text style={styles.modalSubtitle}>相手のユーザーIDを入力してください</Text>
+            <View style={styles.modalInputContainer}>
+              <Ionicons name="person-outline" size={20} color="#8BB6DB" style={styles.modalInputIcon} />
+              <TextInput
+                style={styles.modalInput}
+                value={partnerInput}
+                onChangeText={setPartnerInput}
+                placeholder="ユーザーIDを入力"
+                placeholderTextColor="#A0AEC0"
+              />
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.modalCancelButton} 
+                onPress={() => setPairModalVisible(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.modalConfirmButton} 
+                onPress={handlePairWithPartner}
+              >
+                <Text style={styles.modalConfirmButtonText}>配対する</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 登录弹窗 */}
       <Modal
@@ -470,26 +548,24 @@ export default function Mypage() {
         transparent={true}
         onRequestClose={handleLoginCancel}
       >
-        <TouchableOpacity 
-          style={styles.loginModalOverlay} 
-          activeOpacity={1} 
-          onPress={handleLoginCancel}
-        >
-          <View style={styles.loginModalContent}>
-            <MaterialIcons name="account-circle" size={60} color="#007AFF" />
-            <Text style={styles.loginModalTitle}>ログインが必要です</Text>
-            <Text style={styles.loginModalSubtitle}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.loginModalIconContainer}>
+              <Ionicons name="person-circle" size={60} color="#8BB6DB" />
+            </View>
+            <Text style={styles.modalTitle}>ログインが必要です</Text>
+            <Text style={styles.modalSubtitle}>
               マイページを利用するには{'\n'}ログインしてください
             </Text>
-            <TouchableOpacity style={styles.loginModalButton} onPress={handleLoginPress}>
-              <MaterialIcons name="login" size={20} color="#fff" />
-              <Text style={styles.loginModalButtonText}>ログイン</Text>
+            <TouchableOpacity style={styles.modalConfirmButton} onPress={handleLoginPress}>
+              <Ionicons name="log-in-outline" size={20} color="#fff" />
+              <Text style={styles.modalConfirmButtonText}>ログイン</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.loginModalCancelButton} onPress={handleLoginCancel}>
-              <Text style={styles.loginModalCancelText}>キャンセル</Text>
+            <TouchableOpacity style={styles.modalCancelButton} onPress={handleLoginCancel}>
+              <Text style={styles.modalCancelButtonText}>キャンセル</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* 对方资料弹窗 */}
@@ -508,17 +584,17 @@ export default function Mypage() {
                   source={partnerInfo.avatarUrl ? { uri: partnerInfo.avatarUrl } : require('../assets/avatar.png')}
                   style={styles.modalAvatar}
                 />
-                <Text style={styles.modalNickname}>{partnerInfo.nickname}</Text>
-                <Text style={styles.modalText}>ユーザーID: {partnerInfo.userId}</Text>
-                <Text style={styles.modalText}>誕生日: {partnerInfo.birthday}</Text>
-                <Text style={styles.modalText}>趣味: {partnerInfo.hobby}</Text>
+                <Text style={styles.modalUserName}>{partnerInfo.nickname}</Text>
+                <Text style={styles.modalInfoText}>ユーザーID: {partnerInfo.userId}</Text>
+                <Text style={styles.modalInfoText}>誕生日: {partnerInfo.birthday || '未設定'}</Text>
+                <Text style={styles.modalInfoText}>趣味: {partnerInfo.hobby || '未設定'}</Text>
               </>
             )}
             <TouchableOpacity 
-              style={styles.modalCloseButton} 
+              style={styles.modalConfirmButton} 
               onPress={() => setPartnerProfileModalVisible(false)}
             >
-              <Text style={styles.modalCloseButtonText}>閉じる</Text>
+              <Text style={styles.modalConfirmButtonText}>閉じる</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -530,169 +606,307 @@ export default function Mypage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FDF6F4', // 改为与index.tsx一致的背景色
+    backgroundColor: '#F8FAFC',
+  },
+  backgroundDecoration: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
+  },
+  gradientCircle1: {
+    position: 'absolute',
+    top: -100,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(247, 168, 184, 0.3)',
+    opacity: 0.6,
+  },
+  gradientCircle2: {
+    position: 'absolute',
+    top: 200,
+    left: -80,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(139, 182, 219, 0.4)',
+    opacity: 0.5,
+  },
+  gradientCircle3: {
+    position: 'absolute',
+    bottom: 100,
+    right: -60,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(247, 168, 184, 0.2)',
+    opacity: 0.4,
   },
   scrollView: {
     flex: 1,
+    zIndex: 1,
   },
-  profileSection: {
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  headerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 10 : 20,
+    paddingBottom: 20,
+    zIndex: 1,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: 'rgba(139, 182, 219, 0.3)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2D3748',
+    letterSpacing: 0.5,
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  profileCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: 'hidden', // 确保背景图片不超出卡片边界
+    shadowColor: 'rgba(139, 182, 219, 0.3)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 182, 219, 0.1)',
+  },
+  backgroundImageContainer: {
     position: 'relative',
+    width: '100%',
+    height: 140, // 稍微增加高度
+    marginBottom: -50, // 让头像部分重叠背景图
   },
   backgroundImage: {
     width: '100%',
-    height: 320, // 增加高度让背景更大
-    justifyContent: 'flex-start',
-    alignItems: 'center',
+    height: '100%',
   },
-  // 背景图上的返回按钮
-  backButtonOnBg: {
+  backgroundEditButton: {
     position: 'absolute',
-    top: 40, // 调整位置，让背景顶格
-    left: 16,
-    backgroundColor: 'rgba(255,255,255,0.8)', // 改为白色半透明，更符合风格
-    borderRadius: 20,
-    padding: 8,
-    zIndex: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backgroundTouchable: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  editBackgroundButton: {
-    position: 'absolute',
-    top: 40, // 与返回按钮对齐
+    top: 16,
     right: 16,
-    backgroundColor: 'rgba(255,255,255,0.8)', // 改为白色半透明
-    borderRadius: 20,
-    padding: 8,
-    shadowColor: '#000',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: 'rgba(0, 0, 0, 0.3)',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
+  },
+  backgroundGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80 // 减少渐变高度
+  },
+  profileContentContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 30, // 增加顶部间距以适应头像重叠
+    paddingBottom: 20,
   },
   avatarContainer: {
-    alignItems: 'center',
-    marginTop: -60, // 调整头像位置
+    position: 'relative',
     marginBottom: 20,
+    alignSelf: 'center',
+    zIndex: 2, // 确保头像在背景图之上
   },
   avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 4,
-    borderColor: '#fff',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#f0f0f0',
-    shadowColor: '#000',
+    borderWidth: 4,
+    borderColor: '#ffffff',
+    shadowColor: 'rgba(0, 0, 0, 0.2)',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
   avatarEditIcon: {
     position: 'absolute',
-    right: 8,
-    bottom: 8,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 6,
-    borderWidth: 1,
-    borderColor: '#fbb', // 使用粉色边框，与主题一致
-    shadowColor: '#000',
+    right: 0,
+    bottom: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(139, 182, 219, 0.3)',
+    shadowColor: 'rgba(139, 182, 219, 0.3)',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
   },
-  // 头像下方的用户ID显示
+  userName: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#2D3748',
+    marginBottom: 12,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
   userIdDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: 'rgba(255,187,187,0.15)', // 使用粉色调，与主题一致
+    backgroundColor: 'rgba(139, 182, 219, 0.1)',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,187,187,0.3)',
+    borderColor: 'rgba(139, 182, 219, 0.2)',
+    marginBottom: 20, // 添加底部间距
   },
   userIdText: {
     fontSize: 14,
-    color: '#f66', // 使用主题色
+    color: '#8BB6DB',
     fontFamily: 'monospace',
     fontWeight: '600',
   },
   copyIcon: {
     marginLeft: 8,
   },
-  card: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20, // 与index.tsx的padding保持一致
+  infoCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 20,
     marginBottom: 20,
-    borderRadius: 16, // 更圆润的角
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 5,
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: 'rgba(139, 182, 219, 0.3)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 182, 219, 0.1)',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#f66', // 使用主题色
+    fontWeight: '700',
+    color: '#2D3748',
   },
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,102,102,0.1)', // 粉色背景
+    borderRadius: 16,
+    backgroundColor: 'rgba(139, 182, 219, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 182, 219, 0.2)',
   },
   editButtonText: {
     marginLeft: 4,
     fontSize: 14,
-    color: '#f66',
+    color: '#8BB6DB',
     fontWeight: '600',
   },
   saveButtonText: {
     color: '#4CAF50',
   },
+  infoGroup: {
+    gap: 20,
+  },
   infoItem: {
-    marginBottom: 16,
+    // marginBottom: 20,
   },
   infoLabel: {
     fontSize: 14,
-    color: '#999',
+    color: '#718096',
     marginBottom: 8,
     fontWeight: '600',
   },
   infoText: {
     fontSize: 16,
-    color: '#333',
+    color: '#2D3748',
     fontWeight: '500',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(139, 182, 219, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 182, 219, 0.1)',
   },
-  infoInput: {
-    fontSize: 16,
-    color: '#333',
-    borderWidth: 2,
-    borderColor: '#fbb', // 粉色边框
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 12,
     paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 182, 219, 0.2)',
+    shadowColor: 'rgba(139, 182, 219, 0.1)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#2D3748',
     paddingVertical: 12,
-    backgroundColor: '#fff',
     fontWeight: '500',
+  },
+  pairCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: 'rgba(139, 182, 219, 0.3)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 182, 219, 0.1)',
   },
   pairedContainer: {
     alignItems: 'center',
@@ -700,13 +914,13 @@ const styles = StyleSheet.create({
   pairedStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   pairedText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#f66', // 使用主题色
-    fontWeight: 'bold',
+    color: '#F7A8B8',
+    fontWeight: '700',
   },
   partnerInfoButton: {
     width: '100%',
@@ -715,11 +929,11 @@ const styles = StyleSheet.create({
   partnerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,223,223,0.3)', // 浅粉色背景
+    backgroundColor: 'rgba(247, 168, 184, 0.1)',
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,187,187,0.3)',
+    borderColor: 'rgba(247, 168, 184, 0.2)',
   },
   partnerAvatar: {
     width: 50,
@@ -727,27 +941,28 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginRight: 12,
     borderWidth: 2,
-    borderColor: '#fbb',
+    borderColor: 'rgba(247, 168, 184, 0.3)',
   },
   partnerDetails: {
     flex: 1,
   },
   partnerName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: '#2D3748',
   },
   partnerUserId: {
     fontSize: 12,
-    color: '#666',
+    color: '#718096',
     marginTop: 2,
+    fontFamily: 'monospace',
   },
   unpairButton: {
-    backgroundColor: '#f66', // 使用主题色
+    backgroundColor: '#F7A8B8',
     borderRadius: 12,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    shadowColor: '#f66',
+    shadowColor: '#F7A8B8',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -756,7 +971,7 @@ const styles = StyleSheet.create({
   unpairButtonText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   unpairedContainer: {
     alignItems: 'center',
@@ -764,21 +979,22 @@ const styles = StyleSheet.create({
   unpairedStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   unpairedText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#ccc',
+    color: '#A0AEC0',
+    fontWeight: '600',
   },
   pairButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f66', // 使用主题色
+    backgroundColor: '#8BB6DB',
     borderRadius: 12,
     paddingHorizontal: 24,
     paddingVertical: 14,
-    shadowColor: '#f66',
+    shadowColor: '#8BB6DB',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -788,130 +1004,196 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-  settingsCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 40, // 增加底部间距
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    paddingVertical: 14,
-    marginBottom: 12,
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  saveButtonText2: {
-    marginLeft: 8,
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  actionSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f66', // 使用主题色
-    borderRadius: 12,
-    paddingVertical: 14,
-    shadowColor: '#f66',
-    shadowOffset: { width: 0, height: 4 },
+    backgroundColor: '#F7A8B8',
+    borderRadius: 16,
+    paddingVertical: 16,
+    shadowColor: '#F7A8B8',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowRadius: 16,
+    elevation: 8,
   },
   logoutButtonText: {
     marginLeft: 8,
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
+  // 未登录状态样式
+  unloggedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    zIndex: 1,
+  },
+  unloggedContent: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
+    padding: 40,
+    shadowColor: 'rgba(139, 182, 219, 0.3)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 182, 219, 0.1)',
+  },
+  unloggedIconContainer: {
+    marginBottom: 20,
+  },
+  unloggedTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#2D3748',
+    marginBottom: 12,
+  },
+  unloggedSubtitle: {
+    fontSize: 16,
+    color: '#718096',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 24,
+    fontWeight: '500',
+  },
+  bottomLoginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#8BB6DB',
+    borderRadius: 16,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    shadowColor: '#8BB6DB',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  bottomLoginButtonText: {
+    marginLeft: 8,
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  // 弹窗样式
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderRadius: 24,
     padding: 30,
-    width: '85%',
+    width: width * 0.85,
     maxWidth: 400,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowColor: 'rgba(139, 182, 219, 0.5)',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 182, 219, 0.1)',
+  },
+  loginModalIconContainer: {
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#f66', // 使用主题色
+    fontWeight: '700',
+    color: '#2D3748',
     marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
     textAlign: 'center',
   },
-  modalInput: {
-    width: '100%',
-    borderWidth: 2,
-    borderColor: '#fbb', // 粉色边框
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#718096',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 22,
+    fontWeight: '500',
+  },
+  modalInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 182, 219, 0.2)',
+    marginBottom: 24,
+    width: '100%',
+    shadowColor: 'rgba(139, 182, 219, 0.1)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  modalInputIcon: {
+    marginRight: 12,
+  },
+  modalInput: {
+    flex: 1,
     fontSize: 16,
-    marginBottom: 20,
+    color: '#2D3748',
+    paddingVertical: 12,
+    fontWeight: '500',
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
+    gap: 12,
   },
   modalCancelButton: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'rgba(160, 174, 192, 0.1)',
     borderRadius: 12,
-    paddingVertical: 12,
-    marginRight: 8,
+    paddingVertical: 14,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(160, 174, 192, 0.2)',
   },
   modalCancelButtonText: {
-    color: '#666',
+    color: '#718096',
     fontSize: 16,
     fontWeight: '600',
   },
   modalConfirmButton: {
     flex: 1,
-    backgroundColor: '#f66', // 使用主题色
-    borderRadius: 12,
-    paddingVertical: 12,
-    marginLeft: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#8BB6DB',
+    borderRadius: 12,
+    paddingVertical: 14,
+    shadowColor: '#8BB6DB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   modalConfirmButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    marginLeft: 4,
   },
   modalAvatar: {
     width: 80,
@@ -919,134 +1201,19 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     marginBottom: 16,
     borderWidth: 3,
-    borderColor: '#fbb', // 粉色边框
+    borderColor: 'rgba(139, 182, 219, 0.3)',
   },
-  modalNickname: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+  modalUserName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2D3748',
+    marginBottom: 12,
   },
-  modalText: {
+  modalInfoText: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    color: '#718096',
+    marginBottom: 8,
     textAlign: 'center',
-  },
-  modalCloseButton: {
-    backgroundColor: '#f66', // 使用主题色
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginTop: 16,
-  },
-  modalCloseButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-
-  // 未登录状态样式
-  unloggedContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  unloggedContent: {
-    alignItems: 'center',
-  },
-  unloggedTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#f66', // 使用主题色
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  unloggedSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 24,
-  },
-  bottomLoginButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f66', // 使用主题色
-    borderRadius: 25,
-    paddingHorizontal: 40,
-    paddingVertical: 15,
-    shadowColor: '#f66',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  bottomLoginButtonText: {
-    marginLeft: 8,
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-
-  // 登录弹窗样式
-  loginModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loginModalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 30,
-    width: '85%',
-    maxWidth: 350,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  loginModalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#f66', // 使用主题色
-    marginTop: 15,
-    marginBottom: 10,
-  },
-  loginModalSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 25,
-    lineHeight: 22,
-  },
-  loginModalButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f66', // 使用主题色
-    borderRadius: 25,
-    paddingHorizontal: 35,
-    paddingVertical: 12,
-    marginBottom: 15,
-  },
-  loginModalButtonText: {
-    marginLeft: 8,
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  loginModalCancelButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  loginModalCancelText: {
-    color: '#666',
-    fontSize: 16,
+    fontWeight: '500',
   },
 });
-
-

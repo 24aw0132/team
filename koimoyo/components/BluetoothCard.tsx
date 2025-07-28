@@ -287,7 +287,10 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      setIsHeartAnimating(false);
+      // 使用setTimeout避免在动画回调中直接更新状态
+      setTimeout(() => {
+        setIsHeartAnimating(false);
+      }, 0);
     });
     
     // 保持原有的scaleAnim动画用于其他效果

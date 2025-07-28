@@ -44,6 +44,7 @@ export default function NotificationBell() {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
+    // 监听协作邀请通知
     const q = query(
       collection(db, 'collaboration_invites'),
       where('inviteeId', '==', currentUser.uid),
@@ -56,7 +57,7 @@ export default function NotificationBell() {
         notificationData.push({ id: doc.id, ...doc.data() } as Notification);
       });
       
-      console.log('通知データ更新:', notificationData);
+      console.log('协作通知データ更新:', notificationData);
       
       // 在客户端排序
       notificationData.sort((a, b) => {
@@ -116,7 +117,7 @@ export default function NotificationBell() {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     
     if (diffHours < 1) {
-      return '刚刚';
+      return 'ただ今';
     } else if (diffHours < 24) {
       return `${diffHours}小时前`;
     } else {
@@ -185,7 +186,7 @@ export default function NotificationBell() {
             {notifications.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="notifications-off-outline" size={48} color="#ccc" />
-                <Text style={styles.emptyText}>新しい通知はありません</Text>
+                <Text style={styles.emptyText}>新しい協同編集の招待はありません</Text>
               </View>
             ) : (
               <FlatList

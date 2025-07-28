@@ -20,7 +20,6 @@ import {
   orderBy 
 } from 'firebase/firestore';
 import { useRouter } from 'expo-router';
-import EmojiNotificationList from './EmojiNotificationList';
 
 interface Notification {
   id: string;
@@ -38,9 +37,7 @@ interface Notification {
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [showEmojiModal, setShowEmojiModal] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [emojiUnreadCount, setEmojiUnreadCount] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -48,13 +45,13 @@ export default function NotificationBell() {
     if (!currentUser) return;
 
     // 监听协作邀请通知
-    const collabQuery = query(
+    const q = query(
       collection(db, 'collaboration_invites'),
       where('inviteeId', '==', currentUser.uid),
       where('status', '==', 'pending')
     );
 
-    const collabUnsubscribe = onSnapshot(collabQuery, (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const notificationData: Notification[] = [];
       snapshot.forEach((doc) => {
         notificationData.push({ id: doc.id, ...doc.data() } as Notification);
@@ -72,21 +69,7 @@ export default function NotificationBell() {
       setUnreadCount(notificationData.length);
     });
 
-    // 监听emoji通知
-    const emojiQuery = query(
-      collection(db, 'emoji_notifications'),
-      where('receiverId', '==', currentUser.uid),
-      where('isRead', '==', false)
-    );
-
-    const emojiUnsubscribe = onSnapshot(emojiQuery, (snapshot) => {
-      setEmojiUnreadCount(snapshot.size);
-    });
-
-    return () => {
-      collabUnsubscribe();
-      emojiUnsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
   const handleAcceptInvite = async (notification: Notification) => {
@@ -134,7 +117,7 @@ export default function NotificationBell() {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     
     if (diffHours < 1) {
-      return '刚刚';
+      return 'ただ今';
     } else if (diffHours < 24) {
       return `${diffHours}小时前`;
     } else {
@@ -175,9 +158,9 @@ export default function NotificationBell() {
         onPress={() => setShowModal(true)}
       >
         <Ionicons name="notifications-outline" size={24} color="#333" />
-        {(unreadCount + emojiUnreadCount) > 0 && (
+        {unreadCount > 0 && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{unreadCount + emojiUnreadCount}</Text>
+            <Text style={styles.badgeText}>{unreadCount}</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -200,35 +183,6 @@ export default function NotificationBell() {
               </TouchableOpacity>
             </View>
             
-            {/* 通知类型选择 */}
-            <View style={styles.tabContainer}>
-              <TouchableOpacity 
-                style={styles.tabButton}
-                onPress={() => {
-                  setShowModal(false);
-                  setTimeout(() => setShowEmojiModal(true), 100);
-                }}
-              >
-                <Ionicons name="heart" size={20} color="#ff6b9d" />
-                <Text style={styles.tabText}>絵文字</Text>
-                {emojiUnreadCount > 0 && (
-                  <View style={styles.tabBadge}>
-                    <Text style={styles.tabBadgeText}>{emojiUnreadCount}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={[styles.tabButton, styles.activeTab]}>
-                <Ionicons name="people" size={20} color="#4a90e2" />
-                <Text style={[styles.tabText, styles.activeTabText]}>協同編集</Text>
-                {unreadCount > 0 && (
-                  <View style={styles.tabBadge}>
-                    <Text style={styles.tabBadgeText}>{unreadCount}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-            
             {notifications.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="notifications-off-outline" size={48} color="#ccc" />
@@ -245,12 +199,6 @@ export default function NotificationBell() {
           </View>
         </View>
       </Modal>
-
-      {/* Emoji通知モーダル */}
-      <EmojiNotificationList 
-        visible={showEmojiModal}
-        onClose={() => setShowEmojiModal(false)}
-      />
     </>
   );
 }
@@ -368,49 +316,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     marginTop: 16,
-  },
-  // 新增的tab样式
-  tabContainer: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    position: 'relative',
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#4a90e2',
-  },
-  tabText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 6,
-  },
-  activeTabText: {
-    color: '#4a90e2',
-    fontWeight: '600',
-  },
-  tabBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#ff4757',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
   },
 });

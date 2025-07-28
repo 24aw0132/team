@@ -8,7 +8,8 @@ import {
   Alert,
   Platform,
   TextInput,
-  Animated
+  Animated,
+  Image
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -37,7 +38,11 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
   const [partnerNickname, setPartnerNickname] = useState('');
   const [canGoDiary, setCanGoDiary] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userAvatar, setUserAvatar] = useState('');
+  const [partnerAvatar, setPartnerAvatar] = useState('');
+  const [isHeartAnimating, setIsHeartAnimating] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const heartScaleAnim = useRef(new Animated.Value(1)).current;
   const router = useRouter();
 
   useEffect(() => {
@@ -104,9 +109,13 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
       if (!querySnapshot.empty) {
         const userData = querySnapshot.docs[0].data();
         const partnerId = userData.partnerId;
+        const userAvatarUrl = userData.avatarUrl || '';
         
         console.log('User data:', userData);
         console.log('Partner ID:', partnerId);
+        
+        // 设置当前用户头像
+        setUserAvatar(userAvatarUrl);
         
         if (partnerId) {
           // 已配对
@@ -138,6 +147,7 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
         const partnerData = partnerSnapshot.docs[0].data();
         const partnerAuthUid = partnerData.authUid;
         const nickname = partnerData.nickname || 'パートナー';
+        const partnerAvatarUrl = partnerData.avatarUrl || '';
         
         console.log('Partner data:', partnerData);
         
@@ -148,6 +158,7 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
         setCanGoDiary(true);
         setPartnerNickname(nickname);
         setPartnerUid(partnerAuthUid);
+        setPartnerAvatar(partnerAvatarUrl);
         
         // 保存到本地存储
         await AsyncStorage.setItem(UID_KEY, partnerAuthUid);
@@ -249,6 +260,37 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
 
   // 爱心动画
   const startHeartAnimation = () => {
+    if (isHeartAnimating) return;
+    
+    setIsHeartAnimating(true);
+    
+    // 启动心形跳动动画
+    Animated.sequence([
+      Animated.timing(heartScaleAnim, {
+        toValue: 1.3,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(heartScaleAnim, {
+        toValue: 1.1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(heartScaleAnim, {
+        toValue: 1.25,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(heartScaleAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setIsHeartAnimating(false);
+    });
+    
+    // 保持原有的scaleAnim动画用于其他效果
     Animated.sequence([
       Animated.timing(scaleAnim, {
         toValue: 1.3,
@@ -289,6 +331,7 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
     // 如果已配对且可以写日记，跳转到日记页面
     if (paired && showHeart && canGoDiary) {
       console.log('Navigating to create-diary');
+      startHeartAnimation(); // 触发心形跳动动画
       router.push('/create-diary');
       return;
     }
@@ -412,21 +455,56 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
     setInputUid('');
   };
 
-  // 获取标题文本
+  // 获取标题内容
   const getTitle = () => {
     if (!isLoggedIn) {
-      return 'ログインして相手と連携しよう～';
+      return (
+        <Text style={[styles.title, styles.disabledTitle]}>
+          ログインして相手と連携しよう～
+        </Text>
+      );
+    }
+    
+    if (paired && partnerNickname && userAvatar && partnerAvatar) {
+      return (
+        <View style={styles.avatarTitleContainer}>
+          <Image 
+            source={{ uri: userAvatar }} 
+            style={styles.userAvatarSmall}
+          />
+          <Animated.Image 
+            source={require('../assets/images/loveclick.gif')} 
+            style={[styles.heartIcon, { transform: [{ scale: heartScaleAnim }] }]}
+          />
+          <Image 
+            source={{ uri: partnerAvatar }} 
+            style={styles.partnerAvatarSmall}
+          />
+        </View>
+      );
     }
     
     if (paired && partnerNickname) {
-      return `${partnerNickname}さんと💖`;
+      return (
+        <Text style={styles.title}>
+          {partnerNickname}さんと💖
+        </Text>
+      );
     }
     
     if (paired) {
-      return '連携済みのパートナー💖';
+      return (
+        <Text style={styles.title}>
+          連携済みのパートナー💖
+        </Text>
+      );
     }
     
-    return '相手と一緒に連携しよう～';
+    return (
+      <Text style={styles.title}>
+        相手と一緒に連携しよう～
+      </Text>
+    );
   };
 
   // 获取连接信息文本
@@ -504,12 +582,7 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
       <View style={styles.content}>
         {/* 标题区域 */}
         <View style={styles.titleSection}>
-          <Text style={[
-            styles.title,
-            !isLoggedIn && styles.disabledTitle
-          ]}>
-            {getTitle()}
-          </Text>
+          {getTitle()}
 
           {!isEnabled && (
             <Text style={styles.errorText}>Bluetooth が無効です</Text>
@@ -782,6 +855,31 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     color: '#999',
+  },
+  avatarTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  userAvatarSmall: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#fbb',
+  },
+  partnerAvatarSmall: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#fbb',
+  },
+  heartIcon: {
+    width: 20,
+    height: 20,
+    marginHorizontal: 6,
   },
 });
 

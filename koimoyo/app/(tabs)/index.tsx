@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Text,
+  Alert,
 } from "react-native";
 import TopSection from "../../components/dayCounter";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -15,18 +16,19 @@ import BluetoothCard from "@/components/BluetoothCard";
 import StackedCards from "@/components/Dairycollect";
 import { auth, db } from "../../firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, orderBy, limit, getDocs, onSnapshot, updateDoc } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import NotificationBell from "../../components/NotificationBell";
-import FloatingEmojiButton from "../../components/FloatingEmojiButton";
+import UrgentNotification from "../../components/UrgentNotification";
 
 export default function App() {
   const router = useRouter();
   const [startDate, setStartDate] = useState<Date>(new Date("2024-04-20"));
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);  
   const [hasAnniversary, setHasAnniversary] = useState(false);
+  const [urgentClickCount, setUrgentClickCount] = useState(0); // 催促点击计数
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -57,6 +59,39 @@ export default function App() {
     
     return () => unsubscribe();
   }, []);
+
+  // 监听催促重置通知
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const resetQuery = query(
+      collection(db, 'urgent_notifications'),
+      where('receiverId', '==', currentUser.uid),
+      where('type', '==', 'urgent_reset'),
+      where('isRead', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(resetQuery, (snapshot) => {
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === 'added') {
+          // 收到重置通知，重置计数
+          setUrgentClickCount(0);
+          
+          // 标记重置通知为已读
+          try {
+            await updateDoc(doc(db, 'urgent_notifications', change.doc.id), {
+              isRead: true
+            });
+          } catch (error) {
+            console.error('标记重置通知已读失败:', error);
+          }
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
 
   // 画面がフォーカスされるたびにStackedCardsと記念日データを更新
   useFocusEffect(
@@ -97,6 +132,78 @@ export default function App() {
   const navigateToProfile = () => {
     router.push('/mypage');
   };
+
+  // 催促消息模板
+  const urgentMessages = [
+    "何か言いたそうだよ", // 第1次
+    "ちょっと焦ってるみたい、早く何かしないと", // 第2次
+    "ちょっと怒ってるかも", // 第3次
+    "もう怒ってるよ", // 第4次
+    "お前何してる！早く返事して" // 第5次
+  ];
+
+  const handleLogoPress = async () => {
+    if (!currentUser || !userProfile) {
+      Alert.alert('エラー', 'ログインが必要です');
+      return;
+    }
+
+    // 检查是否有伙伴
+    if (!userProfile.partnerId) {
+      Alert.alert('エラー', 'パートナーとペアリングしてください');
+      return;
+    }
+
+    try {
+      // 根据 partnerId 查找伙伴用户文档
+      const partnerQuery = query(
+        collection(db, 'users'), 
+        where('userId', '==', userProfile.partnerId)
+      );
+      const partnerQuerySnapshot = await getDocs(partnerQuery);
+      
+      if (partnerQuerySnapshot.empty) {
+        Alert.alert('エラー', 'パートナー情報が見つかりません');
+        return;
+      }
+
+      const partnerDoc = partnerQuerySnapshot.docs[0];
+      const partnerData = partnerDoc.data();
+      const partnerAuthUid = partnerData.authUid;
+      const partnerNickname = partnerData.nickname || 'パートナー';
+
+      // 暂时简化逻辑，每次都从计数1开始，避免复杂查询
+      const newCount = Math.min(urgentClickCount + 1, 5);
+      setUrgentClickCount(newCount);
+
+      const messageIndex = newCount - 1;
+      const senderNickname = userProfile.nickname || 'パートナー';
+
+      // 创建催促通知
+      await addDoc(collection(db, 'urgent_notifications'), {
+        senderId: currentUser.uid,
+        senderNickname: senderNickname,
+        receiverId: partnerAuthUid,
+        level: newCount,
+        message: urgentMessages[messageIndex],
+        createdAt: serverTimestamp(),
+        isRead: false,
+        isIgnored: false,
+        type: 'urgent'
+      });
+
+      Alert.alert(
+        '催促送信完了',
+        `${partnerNickname}に催促を送信しました`,
+        [{ text: 'OK', style: 'default' }]
+      );
+
+    } catch (error) {
+      console.error('催促通知送信エラー:', error);
+      Alert.alert('エラー', '送信に失敗しました。もう一度お試しください');
+    }
+  };
+  
   const daysToNextHalfAnniversary = Math.round(nextHalfAnniversary * 365 - daysSince);
   const formattedDate = `${String(startDate.getFullYear()).slice(2)}/${String(
     startDate.getMonth() + 1
@@ -108,10 +215,16 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
+        <View style={styles.headerLeft}>     
           {currentUser && <NotificationBell />}
         </View>
-        <Text style={styles.logo}>❤️こいもよう</Text>
+        <TouchableOpacity onPress={handleLogoPress}>
+          <Image 
+            source={require('../../assets/images/logo.png')} 
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
         <TouchableOpacity 
           onPress={currentUser ? navigateToProfile : navigateToLogin}
           style={styles.avatarContainer}
@@ -165,8 +278,8 @@ export default function App() {
         )}
       </View>
 
-      {/* 悬浮 Emoji 按钮 - 只有当用户已登录时显示 */}
-      {currentUser && <FloatingEmojiButton />}
+      {/* 催促通知弹窗 */}
+      {currentUser && <UrgentNotification />}
     </SafeAreaView>
   );
 }
@@ -192,6 +305,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     color: "#f66",
+  },
+  logoImage: {
+    width: 120,
+    height: 30,
   },
   avatar: {
     width: 40,

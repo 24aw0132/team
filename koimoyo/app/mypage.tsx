@@ -40,55 +40,79 @@ export default function Mypage() {
   // 添加登录弹窗状态
   const [loginModalVisible, setLoginModalVisible] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // 添加加载状态
+  const [isLoading, setIsLoading] = useState(true);
 
   const router = useRouter();
   const PARTNER_UID_KEY = 'PARTNER_UID';
 
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) {
-      // 未登录时显示登录弹窗
-      setIsLoggedIn(false);
-      setLoginModalVisible(true);
-      return;
-    }
+    // 延迟执行，避免在渲染期间更新状态
+    const checkAuthStatus = async () => {
+      setIsLoading(true);
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          setIsLoggedIn(false);
+          // 使用 setTimeout 延迟显示弹窗，避免在渲染期间更新状态
+          setTimeout(() => {
+            setLoginModalVisible(true);
+            setIsLoading(false);
+          }, 100);
+          return;
+        }
 
-    setIsLoggedIn(true);
-    fetchUserData();
-  }, []);
+        setIsLoggedIn(true);
+        await fetchUserData();
+      } catch (error) {
+        console.log('Error checking auth status:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuthStatus();
+  }, []); // 移除不必要的依赖项
 
   const fetchUserData = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
 
-    const q = query(collection(db, 'users'), where('authUid', '==', user.uid));
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      const docSnap = querySnapshot.docs[0];
-      const data = docSnap.data();
-      setUserDocId(docSnap.id);
-      setEmail(data.email || '');
-      setNickname(data.nickname || '');
-      setBirthday(data.birthday || '');
-      setHobby(data.hobby || '');
-      setUserId(data.userId || docSnap.id);
-      setAvatarUrl(data.avatarUrl || '');
-      setBackgroundUrl(data.backgroundUrl || '');
-      setPartnerId(data.partnerId || '');
-      setIsPaired(!!data.partnerId);
-    }
-
-    const localPartnerUid = await AsyncStorage.getItem(PARTNER_UID_KEY);
-    if (localPartnerUid) {
       const q = query(collection(db, 'users'), where('authUid', '==', user.uid));
       const querySnapshot = await getDocs(q);
+
       if (!querySnapshot.empty) {
-        const data = querySnapshot.docs[0].data();
-        if (!data.partnerId) {
-          await AsyncStorage.removeItem(PARTNER_UID_KEY);
+        const docSnap = querySnapshot.docs[0];
+        const data = docSnap.data();
+        
+        // 批量更新状态，避免多次渲染
+        setUserDocId(docSnap.id);
+        setEmail(data.email || '');
+        setNickname(data.nickname || '');
+        setBirthday(data.birthday || '');
+        setHobby(data.hobby || '');
+        setUserId(data.userId || docSnap.id);
+        setAvatarUrl(data.avatarUrl || '');
+        setBackgroundUrl(data.backgroundUrl || '');
+        setPartnerId(data.partnerId || '');
+        setIsPaired(!!data.partnerId);
+      }
+
+      // 检查本地存储的合作伙伴信息
+      const localPartnerUid = await AsyncStorage.getItem(PARTNER_UID_KEY);
+      if (localPartnerUid) {
+        const q = query(collection(db, 'users'), where('authUid', '==', user.uid));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const data = querySnapshot.docs[0].data();
+          if (!data.partnerId) {
+            await AsyncStorage.removeItem(PARTNER_UID_KEY);
+          }
         }
       }
+    } catch (error) {
+      console.log('Error fetching user data:', error);
     }
   };
 
@@ -135,39 +159,56 @@ export default function Mypage() {
 
   // Cloudinary 上传图片通用方法
   const handlePickImage = async (type: 'avatar' | 'background') => {
-    console.log('handlePickImage called with type:', type);
-    
-    // 请求权限
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    console.log('Permission status:', status);
-    
-    if (status !== 'granted') {
-      Alert.alert('権限が必要です', 'フォトライブラリへのアクセス権限を許可してください');
-      return;
-    }
-
-    console.log('Launching image picker...');
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    console.log('Image picker result:', result);
-
-    if (!result.canceled && result.assets.length > 0) {
-      const uri = result.assets[0].uri;
-      const uploadedUrl = await uploadToCloudinary(uri);
-      if (!uploadedUrl) {
-        Alert.alert('アップロード失敗', 'Cloudinary へのアップロードに失敗しました');
+    try {
+      console.log('handlePickImage called with type:', type);
+      
+      // 请求权限
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('Permission status:', status);
+      
+      if (status !== 'granted') {
+        Alert.alert('権限が必要です', 'フォトライブラリへのアクセス権限を許可してください');
         return;
       }
 
-      await updateDoc(doc(db, 'users', userDocId), {
-        [`${type}Url`]: uploadedUrl,
+      console.log('Launching image picker...');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
       });
 
-      type === 'avatar' ? setAvatarUrl(uploadedUrl) : setBackgroundUrl(uploadedUrl);
+      console.log('Image picker result:', result);
+
+      if (!result.canceled && result.assets.length > 0) {
+        const uri = result.assets[0].uri;
+        const uploadedUrl = await uploadToCloudinary(uri);
+        if (!uploadedUrl) {
+          Alert.alert('アップロード失敗', 'Cloudinary へのアップロードに失敗しました');
+          return;
+        }
+
+        // 使用 setTimeout 确保状态更新在下一个渲染周期
+        setTimeout(async () => {
+          try {
+            await updateDoc(doc(db, 'users', userDocId), {
+              [`${type}Url`]: uploadedUrl,
+            });
+
+            if (type === 'avatar') {
+              setAvatarUrl(uploadedUrl);
+            } else {
+              setBackgroundUrl(uploadedUrl);
+            }
+          } catch (error) {
+            console.log('Error updating image:', error);
+            Alert.alert('エラー', '画像の更新に失敗しました');
+          }
+        }, 100);
+      }
+    } catch (error) {
+      console.log('Error in handlePickImage:', error);
+      Alert.alert('エラー', '画像の選択に失敗しました');
     }
   };
 
@@ -279,7 +320,12 @@ export default function Mypage() {
         <View style={styles.gradientCircle3} />
       </View>
 
-      {isLoggedIn ? (
+      {/* 添加加载状态的渲染 */}
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>読み込み中...</Text>
+        </View>
+      ) : isLoggedIn ? (
         <ScrollView 
           style={styles.scrollView} 
           contentContainerStyle={styles.scrollContent}
@@ -438,7 +484,7 @@ export default function Mypage() {
               <View style={styles.pairedContainer}>
                 <View style={styles.pairedStatus}>
                   <Ionicons name="heart" size={24} color="#F7A8B8" />
-                  <Text style={styles.pairedText}>配対中</Text>
+                  <Text style={styles.pairedText}>連携中</Text>
                 </View>
                 <TouchableOpacity 
                   style={styles.partnerInfoButton} 
@@ -457,14 +503,14 @@ export default function Mypage() {
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.unpairButton} onPress={handleUnpair}>
-                  <Text style={styles.unpairButtonText}>配対解除</Text>
+                  <Text style={styles.unpairButtonText}>連携解除</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.unpairedContainer}>
                 <View style={styles.unpairedStatus}>
                   <Ionicons name="heart-dislike-outline" size={24} color="#A0AEC0" />
-                  <Text style={styles.unpairedText}>未配対</Text>
+                  <Text style={styles.unpairedText}>未連携</Text>
                 </View>
                 <TouchableOpacity 
                   style={styles.pairButton} 
@@ -1214,6 +1260,19 @@ const styles = StyleSheet.create({
     color: '#718096',
     marginBottom: 8,
     textAlign: 'center',
+    fontWeight: '500',
+  },
+  // 添加加载样式
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    zIndex: 1,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#718096',
     fontWeight: '500',
   },
 });

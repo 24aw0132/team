@@ -46,14 +46,27 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
   const router = useRouter();
 
   useEffect(() => {
-    initializeComponent();
+    // 使用 setTimeout 延迟初始化，避免在渲染期间更新状态
+    const timer = setTimeout(() => {
+      initializeComponent();
+    }, 0);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   // 初始化组件
   const initializeComponent = async () => {
-    setIsLoading(true);
-    await checkAuthAndPairing();
-    setIsLoading(false);
+    try {
+      setIsLoading(true);
+      await checkAuthAndPairing();
+    } catch (error) {
+      console.error('Error in initializeComponent:', error);
+    } finally {
+      // 使用 setTimeout 确保状态更新在下一个渲染周期
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 0);
+    }
   };
 
   // 检查登录状态和配对状态
@@ -64,13 +77,17 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
       
       if (!user) {
         console.log('No user found, resetting states');
-        setIsLoggedIn(false);
-        resetStates();
+        setTimeout(() => {
+          setIsLoggedIn(false);
+          resetStates();
+        }, 0);
         return;
       }
       
       console.log('User is logged in:', user.uid);
-      setIsLoggedIn(true);
+      setTimeout(() => {
+        setIsLoggedIn(true);
+      }, 0);
       
       // 先获取日记数量，再检查配对状态
       await fetchDiaryCount();
@@ -78,20 +95,25 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
       
     } catch (error) {
       console.error('Error in checkAuthAndPairing:', error);
-      setIsLoggedIn(false);
-      resetStates();
+      setTimeout(() => {
+        setIsLoggedIn(false);
+        resetStates();
+      }, 0);
     }
   };
 
   // 重置状态
   const resetStates = () => {
-    setIsFirstTime(true);
-    setPaired(false);
-    setShowHeart(false);
-    setCanGoDiary(false);
-    setPartnerNickname('');
-    setPartnerUid('');
-    setConnectCount(0);
+    // 使用 setTimeout 延迟状态更新，避免在渲染期间更新状态
+    setTimeout(() => {
+      setIsFirstTime(true);
+      setPaired(false);
+      setShowHeart(false);
+      setCanGoDiary(false);
+      setPartnerNickname('');
+      setPartnerUid('');
+      setConnectCount(0);
+    }, 0);
   };
 
   // 检查现有配对关系
@@ -114,15 +136,19 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
         console.log('User data:', userData);
         console.log('Partner ID:', partnerId);
         
-        // 设置当前用户头像
-        setUserAvatar(userAvatarUrl);
+        // 设置当前用户头像 - 使用 setTimeout 延迟状态更新
+        setTimeout(() => {
+          setUserAvatar(userAvatarUrl);
+        }, 0);
         
         if (partnerId) {
           // 已配对
           await handleExistingPartner(partnerId);
         } else {
           // 未配对
-          handleNoPartner();
+          setTimeout(() => {
+            handleNoPartner();
+          }, 0);
         }
       } else {
         console.log('User document not found');
@@ -151,14 +177,16 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
         
         console.log('Partner data:', partnerData);
         
-        // 更新状态
-        setIsFirstTime(false);
-        setPaired(true);
-        setShowHeart(true);
-        setCanGoDiary(true);
-        setPartnerNickname(nickname);
-        setPartnerUid(partnerAuthUid);
-        setPartnerAvatar(partnerAvatarUrl);
+        // 使用 setTimeout 延迟状态更新，避免在渲染期间更新状态
+        setTimeout(() => {
+          setIsFirstTime(false);
+          setPaired(true);
+          setShowHeart(true);
+          setCanGoDiary(true);
+          setPartnerNickname(nickname);
+          setPartnerUid(partnerAuthUid);
+          setPartnerAvatar(partnerAvatarUrl);
+        }, 0);
         
         // 保存到本地存储
         await AsyncStorage.setItem(UID_KEY, partnerAuthUid);
@@ -166,23 +194,30 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
         console.log('Partner setup complete:', nickname);
       } else {
         console.log('Partner document not found');
-        handleNoPartner();
+        setTimeout(() => {
+          handleNoPartner();
+        }, 0);
       }
     } catch (error) {
       console.error('Error handling existing partner:', error);
-      handleNoPartner();
+      setTimeout(() => {
+        handleNoPartner();
+      }, 0);
     }
   };
 
   // 处理未配对情况
   const handleNoPartner = () => {
     console.log('No partner found');
-    setIsFirstTime(true);
-    setPaired(false);
-    setShowHeart(false);
-    setCanGoDiary(false);
-    setPartnerNickname('');
-    setPartnerUid('');
+    // 使用 setTimeout 延迟状态更新，避免在渲染期间更新状态
+    setTimeout(() => {
+      setIsFirstTime(true);
+      setPaired(false);
+      setShowHeart(false);
+      setCanGoDiary(false);
+      setPartnerNickname('');
+      setPartnerUid('');
+    }, 0);
   };
 
   // 获取日记数量作为连接次数
@@ -236,7 +271,10 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
       console.log('Final diary count:', maxCount);
       
       // 如果没有找到任何日记，设置为0但不显示错误信息
-      setConnectCount(maxCount);
+      // 使用 setTimeout 延迟状态更新，避免在渲染期间更新状态
+      setTimeout(() => {
+        setConnectCount(maxCount);
+      }, 0);
       await AsyncStorage.setItem(CONNECT_COUNT_KEY, maxCount.toString());
       
     } catch (error) {
@@ -247,13 +285,19 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
         if (savedCount) {
           const count = parseInt(savedCount, 10);
           console.log('Using saved count:', count);
-          setConnectCount(count);
+          setTimeout(() => {
+            setConnectCount(count);
+          }, 0);
         } else {
-          setConnectCount(0);
+          setTimeout(() => {
+            setConnectCount(0);
+          }, 0);
         }
       } catch (storageError) {
         console.error('Error reading from AsyncStorage:', storageError);
-        setConnectCount(0);
+        setTimeout(() => {
+          setConnectCount(0);
+        }, 0);
       }
     }
   };
@@ -287,7 +331,10 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      setIsHeartAnimating(false);
+      // 使用 setTimeout 延迟状态更新，避免在渲染期间更新状态
+      setTimeout(() => {
+        setIsHeartAnimating(false);
+      }, 0);
     });
     
     // 保持原有的scaleAnim动画用于其他效果
@@ -324,7 +371,9 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
 
     // 如果是第一次且输入框未显示，显示输入框
     if (isFirstTime && !inputVisible) {
-      setInputVisible(true);
+      setTimeout(() => {
+        setInputVisible(true);
+      }, 0);
       return;
     }
     
@@ -352,7 +401,9 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
     }
 
     try {
-      setIsPairing(true);
+      setTimeout(() => {
+        setIsPairing(true);
+      }, 0);
       console.log('Starting pairing process with ID:', trimmedUid);
       
       // 查找目标用户
@@ -360,7 +411,9 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
       const snapshot = await getDocs(q);
       
       if (snapshot.empty) {
-        setIsPairing(false);
+        setTimeout(() => {
+          setIsPairing(false);
+        }, 0);
         Alert.alert('エラー', 'そのユーザーIDは存在しません。正しいIDを入力してください。');
         return;
       }
@@ -372,14 +425,18 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
       
       // 检查是否试图与自己配对
       if (partnerAuthUid === auth.currentUser?.uid) {
-        setIsPairing(false);
+        setTimeout(() => {
+          setIsPairing(false);
+        }, 0);
         Alert.alert('エラー', '自分自身とはペアリングできません。');
         return;
       }
 
       // 检查对方是否已经有配对
       if (partnerData.partnerId && partnerData.partnerId !== '') {
-        setIsPairing(false);
+        setTimeout(() => {
+          setIsPairing(false);
+        }, 0);
         Alert.alert('エラー', 'このユーザーは既に他の人とペアリング済みです。');
         return;
       }
@@ -418,22 +475,26 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
       // 保存到本地存储
       await AsyncStorage.setItem(UID_KEY, partnerAuthUid);
 
-      // 更新状态
-      setPartnerUid(partnerAuthUid);
-      setPartnerNickname(partnerNickname);
-      setIsFirstTime(false);
-      setInputVisible(false);
-      setPaired(true);
-      setShowHeart(true);
-      setCanGoDiary(true);
-      setIsPairing(false);
-      setInputUid('');
+      // 使用 setTimeout 延迟状态更新，避免在渲染期间更新状态
+      setTimeout(() => {
+        setPartnerUid(partnerAuthUid);
+        setPartnerNickname(partnerNickname);
+        setIsFirstTime(false);
+        setInputVisible(false);
+        setPaired(true);
+        setShowHeart(true);
+        setCanGoDiary(true);
+        setIsPairing(false);
+        setInputUid('');
+      }, 0);
       
       // 重新获取日记数量
       await fetchDiaryCount();
       
       // 播放动画
-      startHeartAnimation();
+      setTimeout(() => {
+        startHeartAnimation();
+      }, 100);
       
       console.log('Pairing successful');
       Alert.alert(
@@ -451,8 +512,11 @@ const BluetoothCard: React.FC<BluetoothCardProps> = ({ isEnabled }) => {
 
   // 取消输入
   const handleCancelInput = () => {
-    setInputVisible(false);
-    setInputUid('');
+    // 使用 setTimeout 延迟状态更新，避免在渲染期间更新状态
+    setTimeout(() => {
+      setInputVisible(false);
+      setInputUid('');
+    }, 0);
   };
 
   // 获取标题内容

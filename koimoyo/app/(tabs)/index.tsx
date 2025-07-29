@@ -218,7 +218,7 @@ export default function App() {
         <View style={styles.headerLeft}>     
           {currentUser && <NotificationBell />}
         </View>
-        <TouchableOpacity onPress={handleLogoPress}>
+        <TouchableOpacity onPress={handleLogoPress} style={styles.logoContainer}>
           <Image 
             source={require('../../assets/images/logo.png')} 
             style={styles.logoImage}
@@ -305,6 +305,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     color: "#f66",
+  },
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoImage: {
     width: 120,
